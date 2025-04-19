@@ -4,7 +4,7 @@
   "description": "Downloads and runs the LinkedIn MCP server executable by Ertiqah, LLC.",
   "main": "cli.js",
   "bin": {
-    "linkedin-mcp-runner": "./cli.js"
+    "linkedin-mcp-runner": "cli.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
