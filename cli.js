@@ -11,13 +11,13 @@ const chmodr = require('chmodr');
 // IMPORTANT: Replace with your actual download URLs
 const executableUrls = {
   darwin: "https://github.com/ertiqah/linkedin-mcp-runner/releases/download/v1.0.0/linkedin-mcp-macos", // macOS (darwin)
-  // win32: "YOUR_WINDOWS_EXE_URL_HERE",      // Windows
+  win32: "https://github.com/ertiqah/linkedin-mcp-runner/releases/download/v1.0.0/linkedin-mcp-win.exe", // Windows
   // linux: "YOUR_LINUX_EXECUTABLE_URL_HERE",   // Linux
 };
 
 const executableNames = {
   darwin: 'linkedin-mcp-macos',
-  // win32: 'linkedin-mcp-win.exe',
+  win32: 'linkedin-mcp-win.exe', // Windows executable name
   // linux: 'linkedin-mcp-linux',
 };
 
