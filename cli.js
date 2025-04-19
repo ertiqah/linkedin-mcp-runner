@@ -10,7 +10,7 @@ const chmodr = require('chmodr');
 // --- Configuration ---
 // IMPORTANT: Replace with your actual download URLs
 const executableUrls = {
-  darwin: "PASTE_YOUR_MACOS_DOWNLOAD_URL_HERE", // macOS (darwin)
+  darwin: "https://github.com/ertiqah/linkedin-mcp-runner/releases/download/v1.0.0/linkedin-mcp-macos", // macOS (darwin)
   // win32: "YOUR_WINDOWS_EXE_URL_HERE",      // Windows
   // linux: "YOUR_LINUX_EXECUTABLE_URL_HERE",   // Linux
 };
