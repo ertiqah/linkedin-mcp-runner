@@ -1,0 +1,11 @@
+# Node dependencies
+node_modules/
+
+# Optional cache directory (if created during local tests)
+.cache/
+
+# OS-specific files
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log* 
