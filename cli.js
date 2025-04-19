@@ -26,38 +26,80 @@ const cacheDir = path.join(os.homedir(), '.cache', packageName);
 // --- End Configuration ---
 
 async function downloadExecutable(url, dest) {
-  console.error(`${packageName}: Downloading executable from ${url} to ${dest}...`);
+  console.error(`${packageName}: Preparing to download from URL: ${url}`);
+  console.error(`${packageName}: Destination path: ${dest}`);
   const writer = fs.createWriteStream(dest);
   try {
+    console.error(`${packageName}: Initiating download request...`);
     const response = await axios({
       url,
       method: 'GET',
       responseType: 'stream',
+      // Adding a timeout
+      timeout: 60000, // 60 seconds timeout
+      // Adding a basic user-agent - sometimes helps with services blocking default agents
+      headers: { 
+        'User-Agent': 'axios/linkedin-mcp-runner-download' 
+      },
       onDownloadProgress: (progressEvent) => {
         const total = parseFloat(progressEvent.total);
         const current = progressEvent.loaded;
-        let percentCompleted = Math.floor((current / total) * 100);
-        // Simple progress indication to stderr
-        process.stderr.write(`${packageName}: Downloading... ${percentCompleted}%\n`);
+        if (total && current) {
+          let percentCompleted = Math.floor((current / total) * 100);
+          process.stderr.write(`${packageName}: Downloading... ${percentCompleted}%\r`);
+        } else {
+          process.stderr.write(`${packageName}: Downloading... (Size unknown)\r`);
+        }
       },
     });
 
+    console.error(`${packageName}: Download request successful (Status: ${response.status}). Piping to file...`);
     response.data.pipe(writer);
 
     return new Promise((resolve, reject) => {
       writer.on('finish', () => {
          process.stderr.write('\n'); // New line after progress
-         console.error(`${packageName}: Download complete.`);
+         console.error(`${packageName}: File write finished.`);
          resolve();
       });
       writer.on('error', (err) => {
-        console.error(`\n${packageName}: Error writing file:`, err);
+        console.error(`\n${packageName}: Error writing file stream:`, err);
         fs.unlink(dest, () => {}); // Attempt to delete partial file
         reject(err);
       });
     });
   } catch (error) {
-     console.error(`\n${packageName}: Error during download:`, error.message || error);
+     console.error(`\n${packageName}: Download attempt failed.`);
+     // Log more detailed error info
+     if (error.response) {
+       // The request was made and the server responded with a status code
+       // that falls out of the range of 2xx
+       console.error(`${packageName}: Server responded with status: ${error.response.status}`);
+       console.error(`${packageName}: Response headers:`, JSON.stringify(error.response.headers, null, 2));
+       // Log response data if available (might be HTML for a 404 page)
+       // Limit logging in case it's huge
+       if (error.response.data) {
+          let responseDataStr = '';
+          if (typeof error.response.data === 'object') {
+             // If it's a stream or buffer, try to read a bit
+             // Note: This might consume the stream, handle with care in production
+             // For debugging, just indicate type
+             responseDataStr = `[Response Data Type: ${typeof error.response.data}]`;
+          } else {
+            responseDataStr = error.response.data.toString().substring(0, 500) + '...';
+          }
+          console.error(`${packageName}: Response data snippet:`, responseDataStr);
+       }       
+     } else if (error.request) {
+       // The request was made but no response was received
+       console.error(`${packageName}: No response received from server. Error details:`, error.message);
+       console.error(`${packageName}: Request config:`, JSON.stringify(error.request.config, null, 2));
+     } else {
+       // Something happened in setting up the request that triggered an Error
+       console.error(`${packageName}: Error setting up request:`, error.message);
+     }
+     console.error(`${packageName}: Full error object:`, error);
+
      // Attempt to delete partial file if writer exists
      if (writer && !writer.closed) {
         writer.close(() => fs.unlink(dest, () => {}));
@@ -94,13 +136,14 @@ async function ensureExecutable(platform) {
 
   const executablePath = path.join(cacheDir, execName);
 
+  console.error(`${packageName}: Checking cache for executable at: ${executablePath}`);
   if (await fs.pathExists(executablePath)) {
-    console.error(`${packageName}: Found cached executable: ${executablePath}`);
+    console.error(`${packageName}: Found cached executable.`);
     // Optional: Add version checking/update logic here if needed
     return executablePath;
   }
 
-  console.error(`${packageName}: Executable not found in cache.`);
+  console.error(`${packageName}: Executable not found in cache. Ensuring cache directory exists at: ${cacheDir}`);
   await fs.ensureDir(cacheDir);
 
   try {
@@ -108,25 +151,28 @@ async function ensureExecutable(platform) {
     await makeExecutable(executablePath);
     return executablePath;
   } catch (error) {
-    console.error(`${packageName}: Failed to obtain executable. Exiting.`);
+    console.error(`${packageName}: Failed to ensure executable is available. See download errors above.`);
     process.exit(1);
   }
 }
 
 async function main() {
   const platform = os.platform(); // e.g., 'darwin', 'win32', 'linux'
+  console.error(`${packageName}: Detected platform: ${platform}`);
   const executablePath = await ensureExecutable(platform);
 
-  console.error(`${packageName}: Starting MCP server: ${executablePath}`);
+  console.error(`${packageName}: Starting MCP server using executable: ${executablePath}`);
 
   // Spawn the Python executable
   const mcpProcess = spawn(executablePath, [], {
     stdio: 'inherit', // Crucial: Inherit stdin, stdout, stderr
     env: {
       ...process.env, // Pass through existing environment variables
-      // Ensure the API key from MCP config's env block is passed
-      // LINKEDIN_MCP_API_KEY should be set by the npx call's environment
     },
+  });
+
+  mcpProcess.on('spawn', () => {
+    console.error(`${packageName}: MCP process successfully spawned.`);
   });
 
   mcpProcess.on('error', (err) => {
@@ -141,18 +187,16 @@ async function main() {
 
   // Graceful shutdown handling
   process.on('SIGINT', () => {
-     console.error(`
-${packageName}: Received SIGINT. Terminating MCP process...`);
-     mcpProcess.kill('SIGINT');
+     console.error(`\n${packageName}: Received SIGINT. Terminating MCP process...`);
+     if (!mcpProcess.killed) mcpProcess.kill('SIGINT');
   });
   process.on('SIGTERM', () => {
-      console.error(`
-${packageName}: Received SIGTERM. Terminating MCP process...`);
-      mcpProcess.kill('SIGTERM');
+      console.error(`\n${packageName}: Received SIGTERM. Terminating MCP process...`);
+      if (!mcpProcess.killed) mcpProcess.kill('SIGTERM');
   });
 }
 
 main().catch(err => {
-  console.error(`${packageName}: Unhandled error:`, err);
+  console.error(`${packageName}: Unhandled error in main function:`, err);
   process.exit(1);
 }); 
