@@ -103,19 +103,28 @@ async function handleRequest(request) {
 
   const { method, params, id } = request;
 
-  // --- Handle Initialize Method --- <<< NEW
+  // --- Handle Initialize Method ---
   if (method === 'initialize') {
+      // Match the structure observed in working MCP servers like 'weather'/'sequential-thinking'
       sendResponse({
           jsonrpc: "2.0",
-          id: id, // Echo back the request id (should be 0)
+          id: id, // Echo back the request id (usually 0)
           result: {
-              capabilities: { /* Define any specific capabilities here if needed */ },
+              protocolVersion: "2024-11-05", // Add protocol version inside result
+              capabilities: { // Add structured capabilities
+                  experimental: {},
+                  prompts: { listChanged: false },
+                  resources: { subscribe: false, listChanged: false },
+                  tools: { listChanged: false }
+              },
               serverInfo: {
                   name: publishedPackageName,
                   version: packageVersion
               }
           }
       });
+      console.error(`${packageName}: Sent detailed initialize response.`);
+      console.error(`${packageName}: Returned from initialize handler.`); 
       return; // Initialization complete
   }
   // --- End Handle Initialize Method ---
@@ -163,6 +172,45 @@ async function handleRequest(request) {
 
   } else {
     // Method not found for any other methods
+    // Check if it's a list request we should potentially handle
+    if (method === 'tools/list') {
+        console.error(`${packageName}: Received tools/list request, sending known tool.`);
+        sendResponse({
+            jsonrpc: "2.0",
+            id: id,
+            result: {
+                tools: [
+                    {
+                        name: "publish_linkedin_post",
+                        description: "Publish a text post to LinkedIn.", // Add a description
+                        inputSchema: { // Define the input schema
+                            type: "object",
+                            properties: {
+                                post_text: {
+                                    type: "string",
+                                    description: "The text content of the LinkedIn post."
+                                }
+                            },
+                            required: ["post_text"]
+                        }
+                    }
+                ]
+            }
+        });
+        return;
+    } else if (method === 'resources/list' || method === 'prompts/list') {
+        // Respond with empty lists for resource/prompt requests like other servers
+        console.error(`${packageName}: Received ${method} request, sending empty list.`);
+        sendResponse({ jsonrpc: "2.0", id: id, result: { [method.split('/')[0]]: [] } });
+        return;
+    } else if (method === 'notifications/initialized') {
+        // Acknowledge this notification, although no response is strictly required
+        console.error(`${packageName}: Received notifications/initialized.`);
+        // No response needed for notifications
+        return;
+    }
+    // Default Method not found for others
+    console.error(`${packageName}: Method not found: ${method}`);
     sendResponse({ jsonrpc: "2.0", error: { code: -32601, message: `Method not found: ${method}` }, id });
   }
 }
@@ -214,15 +262,18 @@ function startMcpServer() {
 // --- Main Execution Logic ---
 async function main() {
 
-    // --- Signal and Exception Handling --- <<< NEW
+    // --- Signal and Exception Handling ---
     process.on('SIGINT', () => {
         console.error(`${packageName}: Received SIGINT. Exiting...`);
-        process.exit(0);
+        process.exit(0); // Exit on Ctrl+C
     });
 
     process.on('SIGTERM', () => {
-        console.error(`${packageName}: Received SIGTERM. Exiting...`);
-        process.exit(0);
+        // IMPORTANT: Do NOT exit on SIGTERM immediately after startup.
+        // Claude seems to send this after initialize, but expects the server to persist.
+        // Log it, but let the setInterval keep the process alive.
+        console.error(`${packageName}: Received SIGTERM. Ignoring to stay alive for MCP.`);
+        // process.exit(0); // <-- REMOVED
     });
 
     process.on('unhandledRejection', (reason, promise) => {
@@ -246,7 +297,7 @@ async function main() {
         setInterval(() => {
             // Log occasionally to show it's alive
             // console.error(`${packageName}: Keep-alive interval tick.`);
-        }, 60000); // Use a 1-minute interval <<< CHANGED
+        }, 60000); // Use a 1-minute interval
 
         console.error(`${packageName}: Process should remain active indefinitely.`);
     }
