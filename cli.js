@@ -148,9 +148,10 @@ async function handleRequest(request) {
               console.error(`${packageName}: Calling backend API: ${backendApiUrl}`);
               const apiResponse = await axios.post(backendApiUrl, payload, { headers, timeout: 30000 });
               console.error(`${packageName}: Backend API response status: ${apiResponse.status}`);
+              console.error(`${packageName}: Backend API response data:`, JSON.stringify(apiResponse.data, null, 2));
 
               if (apiResponse.data && apiResponse.data.success) {
-                  sendResponse({ jsonrpc: "2.0", result: "✅ Successfully published post to LinkedIn.", id });
+                  sendResponse({ jsonrpc: "2.0", result: { message: "✅ Successfully published post to LinkedIn." }, id });
               } else {
                   const errorMessage = apiResponse.data?.error || "Backend API Error (no detail)";
                   console.error(`${packageName}: Backend API Error: ${errorMessage}`);
