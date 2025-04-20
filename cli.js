@@ -213,6 +213,26 @@ function startMcpServer() {
 
 // --- Main Execution Logic ---
 async function main() {
+
+    // --- Signal and Exception Handling --- <<< NEW
+    process.on('SIGINT', () => {
+        console.error(`${packageName}: Received SIGINT. Exiting...`);
+        process.exit(0);
+    });
+
+    process.on('SIGTERM', () => {
+        console.error(`${packageName}: Received SIGTERM. Exiting...`);
+        process.exit(0);
+    });
+
+    process.on('unhandledRejection', (reason, promise) => {
+        console.error(`${packageName}: Unhandled Rejection at:`, promise, 'reason:', reason);
+        // Application specific logging, throwing an error, or other logic here
+        // Consider exiting if this state is unrecoverable
+        // process.exit(1); // Optional: exit on unhandled rejection
+    });
+    // --- End Signal and Exception Handling ---
+
     const args = process.argv.slice(2);
     if (args.length > 0 && args[0].toLowerCase() === 'setup') {
         const apiKey = parseApiKeyArg(args.slice(1));
@@ -224,15 +244,15 @@ async function main() {
         // --- Keep Process Alive ---
         console.error(`${packageName}: Setting keep-alive interval.`);
         setInterval(() => {
-            // This function doesn't need to do anything.
-            // Its existence keeps the event loop busy.
-        }, 1 << 30); // Use a very large interval (approx 12 days) to minimize overhead.
+            // Log occasionally to show it's alive
+            // console.error(`${packageName}: Keep-alive interval tick.`);
+        }, 60000); // Use a 1-minute interval <<< CHANGED
 
         console.error(`${packageName}: Process should remain active indefinitely.`);
     }
 }
 
 main().catch(err => {
-    console.error(`${packageName}: Unhandled error:`, err);
+    console.error(`${packageName}: Unhandled error in main:`, err);
     process.exit(1);
 }); 
