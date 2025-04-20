@@ -151,7 +151,17 @@ async function handleRequest(request) {
               console.error(`${packageName}: Backend API response data:`, JSON.stringify(apiResponse.data, null, 2));
 
               if (apiResponse.data && apiResponse.data.success) {
-                  sendResponse({ jsonrpc: "2.0", result: { message: "✅ Successfully published post to LinkedIn." }, id });
+                  // Include post_urn from backend if available
+                  const postDetails = apiResponse.data.post_urn ? 
+                    ` (Post ID: ${apiResponse.data.post_urn})` : '';
+                  
+                  sendResponse({ 
+                    jsonrpc: "2.0", 
+                    result: { 
+                      text: `✅ Successfully published post to LinkedIn${postDetails}.` 
+                    }, 
+                    id 
+                  });
               } else {
                   const errorMessage = apiResponse.data?.error || "Backend API Error (no detail)";
                   console.error(`${packageName}: Backend API Error: ${errorMessage}`);
