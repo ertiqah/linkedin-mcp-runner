@@ -22,7 +22,6 @@
   },
   "dependencies": {
     "axios": "^1.7.7",
-    "chmodr": "^1.2.0",
     "fs-extra": "^11.2.0"
   }
 }
