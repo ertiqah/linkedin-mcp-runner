@@ -41,7 +41,6 @@ function getConfigPath() {
             // Linux path might vary, use common default but mention others
              const standardPath = path.join(os.homedir(), '.config', 'Claude', 'claude_desktop_config.json');
              // Add checks for snap/flatpak if necessary in the future
-             // For now, stick to the standard XDG base directory convention
              return standardPath;
         default:
             console.error(`Error: Unsupported platform for setup: ${platform}`);
@@ -142,8 +141,6 @@ async function runSetup(apiKeyFromArg) {
 function sendResponse(response) {
   const responseString = JSON.stringify(response);
   console.log(responseString); // Write to stdout, MCP expects newline delimited
-  // Log for debugging what we sent
-  // console.error(`${packageName}: SENT Response: ${responseString}`);
 }
 
 // Function to handle incoming requests
@@ -185,8 +182,6 @@ async function handleRequest(request) {
          timeout: 30000 // 30 second timeout
       });
 
-      // console.error(`${packageName}: Backend response status: ${apiResponse.status}`);
-      // console.error(`${packageName}: Backend response data:`, apiResponse.data);
 
       // Assuming the backend API responds with JSON, check for its success/error structure
        if (apiResponse.data && apiResponse.data.success) {
@@ -246,24 +241,18 @@ function startMcpServer() {
     });
 
     rl.on('line', (line) => {
-      // console.error(`${packageName}: RECV Request: ${line}`);
       try {
         const request = JSON.parse(line);
         handleRequest(request); // handleRequest is async but we don't wait here - process requests independently
       } catch (e) {
-        // Handle JSON parse error specifically
-        // console.error(`${packageName}: Failed to parse JSON request:`, e);
         sendResponse({ jsonrpc: "2.0", error: { code: -32700, message: "Parse error" }, id: null });
       }
     });
 
     rl.on('close', () => {
-     // console.error(`${packageName}: stdin closed. Exiting.`);
       process.exit(0);
     });
 
-    // Indicate readiness (optional, but can be useful for debugging)
-    // console.error(`${packageName}: Ready to receive MCP requests on stdin.`);
 }
 // --- End MCP Server Functions ---
 
