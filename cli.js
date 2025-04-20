@@ -213,16 +213,20 @@ async function main() {
     if (args.length > 0 && args[0].toLowerCase() === 'setup') {
         const apiKey = parseApiKeyArg(args.slice(1));
         await runSetup(apiKey);
-        // Setup finished, exit explicitly
         process.exit(0);
     } else {
         startMcpServer();
-        // Keep the process alive explicitly after setting up the server listener
-        // This prevents Node from exiting if only the stdin listener is active
-        // A simple interval is one way, though readline should suffice.
-        // Let's rely on readline keeping it alive for now and only add this
-        // if the problem persists.
-        console.error(`${packageName}: Process should remain active, listening for MCP messages.`);
+
+        // --- Keep Process Alive --- <<< NEW
+        // Add a persistent interval timer to keep the Node.js event loop
+        // active and prevent the process from exiting while readline listens.
+        console.error(`${packageName}: Setting keep-alive interval.`);
+        setInterval(() => {
+            // This function doesn't need to do anything.
+            // Its existence keeps the event loop busy.
+        }, 1 << 30); // Use a very large interval (approx 12 days) to minimize overhead.
+
+        console.error(`${packageName}: Process should remain active indefinitely.`);
     }
 }
 
