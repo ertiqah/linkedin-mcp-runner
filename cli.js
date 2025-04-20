@@ -8,7 +8,8 @@ const readline = require('readline');
 
 // --- Configuration ---
 const packageName = 'linkedin-mcp-runner'; // Used for messages
-const backendApiUrl = 'http://localhost:5000/api/mcp/publish-linkedin-post';
+const backendApiUrl =
+  "https://staging.btensai.com/api/mcp/publish-linkedin-post";
 
 // Get the actual package name from package.json for the setup command
 let publishedPackageName = packageName; // Default
