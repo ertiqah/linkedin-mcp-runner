@@ -167,17 +167,42 @@ async function handleRequest(request) {
   }
 }
 
+// Function to start the MCP server listener
 function startMcpServer() {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: false });
+    console.error(`${packageName}: Setting up MCP listener on stdin/stdout...`);
+
+    const rl = readline.createInterface({
+      input: process.stdin,
+      terminal: false
+    });
+
     rl.on('line', (line) => {
+      console.error(`${packageName}: Received line: ${line.substring(0, 100)}...`); // Log received data
       try {
         const request = JSON.parse(line);
-        handleRequest(request);
+        // Intentionally not awaiting handleRequest to process lines quickly
+        handleRequest(request).catch(err => {
+            // Catch potential errors within the async handleRequest itself
+            console.error(`${packageName}: Error during async handleRequest:`, err);
+            // Attempt to send a generic error response if possible
+            const id = request?.id ?? null;
+            if (id !== null) {
+                sendResponse({ jsonrpc: "2.0", error: { code: -32000, message: "Internal Server Error during request handling" }, id });
+            }
+        });
       } catch (e) {
+        console.error(`${packageName}: Failed to parse JSON request:`, e);
         sendResponse({ jsonrpc: "2.0", error: { code: -32700, message: "Parse error" }, id: null });
       }
     });
-    rl.on('close', () => { process.exit(0); });
+
+    rl.on('close', () => {
+      console.error(`${packageName}: stdin closed. Exiting.`);
+      process.exit(0);
+    });
+
+    // Indicate readiness (optional, but can be useful for debugging)
+    console.error(`${packageName}: MCP listener ready.`);
 }
 // --- End MCP Server Functions ---
 
@@ -188,8 +213,16 @@ async function main() {
     if (args.length > 0 && args[0].toLowerCase() === 'setup') {
         const apiKey = parseApiKeyArg(args.slice(1));
         await runSetup(apiKey);
+        // Setup finished, exit explicitly
+        process.exit(0);
     } else {
         startMcpServer();
+        // Keep the process alive explicitly after setting up the server listener
+        // This prevents Node from exiting if only the stdin listener is active
+        // A simple interval is one way, though readline should suffice.
+        // Let's rely on readline keeping it alive for now and only add this
+        // if the problem persists.
+        console.error(`${packageName}: Process should remain active, listening for MCP messages.`);
     }
 }
 
