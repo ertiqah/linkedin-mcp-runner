@@ -1,12 +1,6 @@
 # LinkedIn MCP Runner by Ertiqah, LLC
 
-This package provides a Model Context Protocol (MCP) server for the Claude Desktop application, allowing you to publish posts to LinkedIn via your Ligo account.
-
-## Prerequisites
-
-1.  **Claude Desktop App:** You need to have the Claude Desktop application installed.
-2.  **Node.js and npm:** This package requires Node.js (which includes npm and npx) to be installed on your system. Claude Desktop likely requires this already. You can download it from [nodejs.org](https://nodejs.org/) if needed.
-3.  **Ligo Account:** You need an account on [ligo.ertiqah.com](https://ligo.ertiqah.com/).
+This package allows you to interact with your LinkedIn account (primarily for posting & scheduling posts) using the Claude Desktop Application. 
 
 ## Setup Instructions
 
