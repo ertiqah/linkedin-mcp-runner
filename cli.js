@@ -197,8 +197,12 @@ function startMcpServer() {
     });
 
     rl.on('close', () => {
-      console.error(`${packageName}: stdin closed. Exiting.`);
-      process.exit(0);
+      // NOTE: Do NOT exit here. If stdin closes, the process should ideally stay alive
+      // (e.g., via the setInterval) to handle potential future signals or work,
+      // or exit naturally if the event loop becomes empty.
+      // Exiting explicitly here was likely causing the 'Server closed unexpectedly' error.
+      console.error(`${packageName}: stdin closed. Process will continue running if keep-alive is active.`);
+      // process.exit(0); // <-- REMOVED
     });
 
     // Indicate readiness (optional, but can be useful for debugging)
@@ -217,9 +221,7 @@ async function main() {
     } else {
         startMcpServer();
 
-        // --- Keep Process Alive --- <<< NEW
-        // Add a persistent interval timer to keep the Node.js event loop
-        // active and prevent the process from exiting while readline listens.
+        // --- Keep Process Alive ---
         console.error(`${packageName}: Setting keep-alive interval.`);
         setInterval(() => {
             // This function doesn't need to do anything.
