@@ -158,30 +158,60 @@ async function handleRequest(request) {
                   sendResponse({ 
                     jsonrpc: "2.0", 
                     result: { 
-                      text: `✅ Successfully published post to LinkedIn${postDetails}.` 
+                      content: [
+                        {
+                          type: "text",
+                          text: `✅ Successfully published post to LinkedIn${postDetails}.`
+                        }
+                      ],
+                      isError: false
                     }, 
                     id 
                   });
               } else {
                   const errorMessage = apiResponse.data?.error || "Backend API Error (no detail)";
                   console.error(`${packageName}: Backend API Error: ${errorMessage}`);
-                  sendResponse({ jsonrpc: "2.0", error: { code: -32002, message: `Backend API Error: ${errorMessage}` }, id });
+                  // Report error within the result object
+                  sendResponse({ 
+                    jsonrpc: "2.0", 
+                    result: {
+                      content: [
+                        {
+                          type: "text",
+                          text: `Failed to publish post to LinkedIn: ${errorMessage}`
+                        }
+                      ],
+                      isError: true // Indicate tool execution error
+                    }, 
+                    id 
+                  });
               }
 
           } catch (error) {
-              let errorCode = -32000;
               let errorMessage = `Failed to call backend API: ${error.message}`;
+              // Determine a user-facing error message based on the error type
               if (error.response) {
                   errorMessage = `Backend API Error (Status ${error.response.status})`;
-                  if (error.response.status === 401 || error.response.status === 403) { errorCode = -32001; }
-                  else if (error.response.status === 400) { errorCode = -32602; }
                   console.error(`${packageName}: Backend API Error Response:`, error.response.data); 
               } else if (error.request) {
                   errorMessage = "No response received from backend API.";
-                  errorCode = -32003;
               }
               console.error(`${packageName}: ${errorMessage}`);
-              sendResponse({ jsonrpc: "2.0", error: { code: errorCode, message: errorMessage }, id });
+              
+              // Report error within the result object
+              sendResponse({ 
+                jsonrpc: "2.0", 
+                result: { 
+                  content: [
+                    {
+                      type: "text",
+                      text: `Failed to publish post to LinkedIn: ${errorMessage}`
+                    }
+                  ],
+                  isError: true // Indicate tool execution error
+                }, 
+                id 
+              });
           }
       } else {
           console.error(`${packageName}: Received tools/call for unknown tool: ${name}`);
