@@ -6,13 +6,13 @@ const path = require('path');
 const axios = require('axios');
 const readline = require('readline');
 
-// --- Configuration ---
-const packageName = 'linkedin-mcp-runner'; // Used for messages
-const backendApiUrl = 'https://staging.btensai.com/api/mcp/publish-linkedin-post'; // <<< Updated backend URL
+// Configuration
+const packageName = 'linkedin-mcp-runner';
+const backendApiUrl = 'https://staging.btensai.com/api/mcp/publish-linkedin-post';
 
 // Get the actual package name and version from package.json
-let publishedPackageName = packageName; // Default
-let packageVersion = '0.0.0'; // Default
+let publishedPackageName = packageName;
+let packageVersion = '0.0.0';
 try {
   const pkgJsonPath = path.join(__dirname, 'package.json');
   if (fs.existsSync(pkgJsonPath)) {
@@ -23,10 +23,8 @@ try {
 } catch (e) {
   console.error(`${packageName}: Warning - Could not read package.json. Using defaults.`);
 }
-// --- End Configuration ---
 
-
-// --- Setup Functions ---
+// Setup Functions
 function getConfigPath() {
     const platform = os.platform();
     switch (platform) {
@@ -43,11 +41,13 @@ function getConfigPath() {
             console.error(`Error: Unsupported platform: ${platform}`); process.exit(1);
     }
 }
+
 function parseApiKeyArg(args) {
     const apiKeyIndex = args.indexOf('--api-key');
     if (apiKeyIndex !== -1 && apiKeyIndex + 1 < args.length) { return args[apiKeyIndex + 1]; }
     return null;
 }
+
 async function runSetup(apiKeyFromArg) {
     console.log(`Running ${packageName} setup...`);
     const configPath = getConfigPath();
@@ -77,11 +77,8 @@ async function runSetup(apiKeyFromArg) {
         console.log("----------------------------------------------------------\n");
     } catch (err) { console.error(`Error writing config: ${err}`); process.exit(1); }
 }
-// --- End Setup Functions ---
 
-
-// --- MCP Server Functions (Pure Node.js) ---
-
+// MCP Server Functions
 function sendResponse(response) {
   const responseString = JSON.stringify(response);
   console.log(responseString);
@@ -89,29 +86,24 @@ function sendResponse(response) {
 
 async function handleRequest(request) {
   if (!request || typeof request !== 'object' || request.jsonrpc !== '2.0' || !request.id === undefined || typeof request.method !== 'string') {
-    // Note: Allow request.id to be 0 or null for notifications, but spec says it SHOULD exist for requests requiring response.
-    // Let's be strict for now and require non-null id for non-notification methods.
-     const id = request?.id ?? null; // Use provided id or null
-     if(id !== null && request?.method !== 'initialize') { // Allow initialize without strict id check just in case, but respond if possible
+     const id = request?.id ?? null;
+     if(id !== null && request?.method !== 'initialize') {
          sendResponse({ jsonrpc: "2.0", error: { code: -32600, message: "Invalid Request Structure" }, id });
          return;
      }
-     // If it's potentially a notification or malformed, we might just ignore or log.
-     // For now, let's focus on handling valid requests.
-     if(id === null && request?.method !== 'initialize') return; // Ignore notifications for now
+     if(id === null && request?.method !== 'initialize') return;
   }
 
   const { method, params, id } = request;
 
-  // --- Handle Initialize Method ---
+  // Handle Initialize Method
   if (method === 'initialize') {
-      // Match the structure observed in working MCP servers like 'weather'/'sequential-thinking'
       sendResponse({
           jsonrpc: "2.0",
-          id: id, // Echo back the request id (usually 0)
+          id: id,
           result: {
-              protocolVersion: "2024-11-05", // Add protocol version inside result
-              capabilities: { // Add structured capabilities
+              protocolVersion: "2024-11-05",
+              capabilities: {
                   experimental: {},
                   prompts: { listChanged: false },
                   resources: { subscribe: false, listChanged: false },
@@ -125,94 +117,106 @@ async function handleRequest(request) {
       });
       console.error(`${packageName}: Sent detailed initialize response.`);
       console.error(`${packageName}: Returned from initialize handler.`); 
-      return; // Initialization complete
+      return;
   }
-  // --- End Handle Initialize Method ---
 
-  // --- Handle publish_linkedin_post Method ---
-  if (method === 'publish_linkedin_post') {
-    const apiKey = process.env.LINKEDIN_MCP_API_KEY;
-    const postText = params?.post_text;
-
-    if (!apiKey) {
-      sendResponse({ jsonrpc: "2.0", error: { code: -32001, message: "Server Configuration Error: API Key not set." }, id });
-      return;
-    }
-    if (typeof postText !== 'string' || postText.trim() === '') {
-      sendResponse({ jsonrpc: "2.0", error: { code: -32602, message: "Invalid params: 'post_text' required." }, id });
-      return;
-    }
-
-    try {
-      const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Accept": "application/json" };
-      const payload = { "post_text": postText };
-      const apiResponse = await axios.post(backendApiUrl, payload, { headers, timeout: 30000 });
-
-       if (apiResponse.data && apiResponse.data.success) {
-            sendResponse({ jsonrpc: "2.0", result: "✅ Successfully published post to LinkedIn.", id });
-       } else {
-           const errorMessage = apiResponse.data?.error || "Backend API Error (no detail)";
-           sendResponse({ jsonrpc: "2.0", error: { code: -32002, message: `Backend API Error: ${errorMessage}` }, id });
-       }
-
-    } catch (error) {
-      let errorCode = -32000;
-      let errorMessage = `Failed to call backend API: ${error.message}`;
-      if (error.response) {
-        errorMessage = `Backend API Error (Status ${error.response.status})`;
-         if (error.response.status === 401 || error.response.status === 403) { errorCode = -32001; }
-         else if (error.response.status === 400) { errorCode = -32602; }
-      } else if (error.request) {
-        errorMessage = "No response received from backend API.";
-        errorCode = -32003;
+  // Handle tools/call Method
+  if (method === 'tools/call') {
+      if (!params || typeof params !== 'object') {
+          sendResponse({ jsonrpc: "2.0", error: { code: -32602, message: "Invalid params for tools/call" }, id });
+          return;
       }
-      sendResponse({ jsonrpc: "2.0", error: { code: errorCode, message: errorMessage }, id });
-    }
-  // --- End Handle publish_linkedin_post Method ---
+      const { name, arguments: args } = params;
 
-  } else {
-    // Method not found for any other methods
-    // Check if it's a list request we should potentially handle
-    if (method === 'tools/list') {
-        console.error(`${packageName}: Received tools/list request, sending known tool.`);
-        sendResponse({
-            jsonrpc: "2.0",
-            id: id,
-            result: {
-                tools: [
-                    {
-                        name: "publish_linkedin_post",
-                        description: "Publish a text post to LinkedIn.", // Add a description
-                        inputSchema: { // Define the input schema
-                            type: "object",
-                            properties: {
-                                post_text: {
-                                    type: "string",
-                                    description: "The text content of the LinkedIn post."
-                                }
-                            },
-                            required: ["post_text"]
-                        }
-                    }
-                ]
-            }
-        });
-        return;
-    } else if (method === 'resources/list' || method === 'prompts/list') {
-        // Respond with empty lists for resource/prompt requests like other servers
-        console.error(`${packageName}: Received ${method} request, sending empty list.`);
-        sendResponse({ jsonrpc: "2.0", id: id, result: { [method.split('/')[0]]: [] } });
-        return;
-    } else if (method === 'notifications/initialized') {
-        // Acknowledge this notification, although no response is strictly required
-        console.error(`${packageName}: Received notifications/initialized.`);
-        // No response needed for notifications
-        return;
-    }
-    // Default Method not found for others
-    console.error(`${packageName}: Method not found: ${method}`);
-    sendResponse({ jsonrpc: "2.0", error: { code: -32601, message: `Method not found: ${method}` }, id });
+      if (name === 'publish_linkedin_post') {
+          console.error(`${packageName}: Received call for publish_linkedin_post tool.`);
+          const apiKey = process.env.LINKEDIN_MCP_API_KEY;
+          const postText = args?.post_text;
+
+          if (!apiKey) {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32001, message: "Server Configuration Error: API Key not set." }, id });
+              return;
+          }
+          if (typeof postText !== 'string' || postText.trim() === '') {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32602, message: "Invalid arguments: 'post_text' required." }, id });
+              return;
+          }
+
+          try {
+              const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Accept": "application/json" };
+              const payload = { "post_text": postText };
+              console.error(`${packageName}: Calling backend API: ${backendApiUrl}`);
+              const apiResponse = await axios.post(backendApiUrl, payload, { headers, timeout: 30000 });
+              console.error(`${packageName}: Backend API response status: ${apiResponse.status}`);
+
+              if (apiResponse.data && apiResponse.data.success) {
+                  sendResponse({ jsonrpc: "2.0", result: "✅ Successfully published post to LinkedIn.", id });
+              } else {
+                  const errorMessage = apiResponse.data?.error || "Backend API Error (no detail)";
+                  console.error(`${packageName}: Backend API Error: ${errorMessage}`);
+                  sendResponse({ jsonrpc: "2.0", error: { code: -32002, message: `Backend API Error: ${errorMessage}` }, id });
+              }
+
+          } catch (error) {
+              let errorCode = -32000;
+              let errorMessage = `Failed to call backend API: ${error.message}`;
+              if (error.response) {
+                  errorMessage = `Backend API Error (Status ${error.response.status})`;
+                  if (error.response.status === 401 || error.response.status === 403) { errorCode = -32001; }
+                  else if (error.response.status === 400) { errorCode = -32602; }
+                  console.error(`${packageName}: Backend API Error Response:`, error.response.data); 
+              } else if (error.request) {
+                  errorMessage = "No response received from backend API.";
+                  errorCode = -32003;
+              }
+              console.error(`${packageName}: ${errorMessage}`);
+              sendResponse({ jsonrpc: "2.0", error: { code: errorCode, message: errorMessage }, id });
+          }
+      } else {
+          console.error(`${packageName}: Received tools/call for unknown tool: ${name}`);
+          sendResponse({ jsonrpc: "2.0", error: { code: -32601, message: `Tool not found: ${name}` }, id });
+      }
+      return;
   }
+
+  // Handle list requests and notifications
+  if (method === 'tools/list') {
+      console.error(`${packageName}: Received tools/list request, sending known tool.`);
+      sendResponse({
+          jsonrpc: "2.0",
+          id: id,
+          result: {
+              tools: [
+                  {
+                      name: "publish_linkedin_post",
+                      description: "Publish a text post to LinkedIn.",
+                      inputSchema: {
+                          type: "object",
+                          properties: {
+                              post_text: {
+                                  type: "string",
+                                  description: "The text content of the LinkedIn post."
+                              }
+                          },
+                          required: ["post_text"]
+                      }
+                  }
+              ]
+          }
+      });
+      return;
+  } else if (method === 'resources/list' || method === 'prompts/list') {
+      console.error(`${packageName}: Received ${method} request, sending empty list.`);
+      sendResponse({ jsonrpc: "2.0", id: id, result: { [method.split('/')[0]]: [] } });
+      return;
+  } else if (method === 'notifications/initialized') {
+      console.error(`${packageName}: Received notifications/initialized.`);
+      return;
+  }
+
+  // Default Method not found for others
+  console.error(`${packageName}: Method not found: ${method}`);
+  sendResponse({ jsonrpc: "2.0", error: { code: -32601, message: `Method not found: ${method}` }, id });
 }
 
 // Function to start the MCP server listener
@@ -225,14 +229,11 @@ function startMcpServer() {
     });
 
     rl.on('line', (line) => {
-      console.error(`${packageName}: Received line: ${line.substring(0, 100)}...`); // Log received data
+      console.error(`${packageName}: Received line: ${line.substring(0, 100)}...`);
       try {
         const request = JSON.parse(line);
-        // Intentionally not awaiting handleRequest to process lines quickly
         handleRequest(request).catch(err => {
-            // Catch potential errors within the async handleRequest itself
             console.error(`${packageName}: Error during async handleRequest:`, err);
-            // Attempt to send a generic error response if possible
             const id = request?.id ?? null;
             if (id !== null) {
                 sendResponse({ jsonrpc: "2.0", error: { code: -32000, message: "Internal Server Error during request handling" }, id });
@@ -245,44 +246,31 @@ function startMcpServer() {
     });
 
     rl.on('close', () => {
-      // NOTE: Do NOT exit here. If stdin closes, the process should ideally stay alive
-      // (e.g., via the setInterval) to handle potential future signals or work,
-      // or exit naturally if the event loop becomes empty.
-      // Exiting explicitly here was likely causing the 'Server closed unexpectedly' error.
+      // Do NOT exit here. If stdin closes, the process should ideally stay alive
+      // to handle potential future signals or work.
       console.error(`${packageName}: stdin closed. Process will continue running if keep-alive is active.`);
-      // process.exit(0); // <-- REMOVED
     });
 
-    // Indicate readiness (optional, but can be useful for debugging)
     console.error(`${packageName}: MCP listener ready.`);
 }
-// --- End MCP Server Functions ---
 
-
-// --- Main Execution Logic ---
+// Main Execution Logic
 async function main() {
 
-    // --- Signal and Exception Handling ---
+    // Signal and Exception Handling
     process.on('SIGINT', () => {
         console.error(`${packageName}: Received SIGINT. Exiting...`);
-        process.exit(0); // Exit on Ctrl+C
+        process.exit(0);
     });
 
     process.on('SIGTERM', () => {
-        // IMPORTANT: Do NOT exit on SIGTERM immediately after startup.
-        // Claude seems to send this after initialize, but expects the server to persist.
-        // Log it, but let the setInterval keep the process alive.
+        // Do NOT exit on SIGTERM - Claude sends this after initialize, but expects the server to persist
         console.error(`${packageName}: Received SIGTERM. Ignoring to stay alive for MCP.`);
-        // process.exit(0); // <-- REMOVED
     });
 
     process.on('unhandledRejection', (reason, promise) => {
         console.error(`${packageName}: Unhandled Rejection at:`, promise, 'reason:', reason);
-        // Application specific logging, throwing an error, or other logic here
-        // Consider exiting if this state is unrecoverable
-        // process.exit(1); // Optional: exit on unhandled rejection
     });
-    // --- End Signal and Exception Handling ---
 
     const args = process.argv.slice(2);
     if (args.length > 0 && args[0].toLowerCase() === 'setup') {
@@ -292,12 +280,11 @@ async function main() {
     } else {
         startMcpServer();
 
-        // --- Keep Process Alive ---
+        // Keep Process Alive
         console.error(`${packageName}: Setting keep-alive interval.`);
         setInterval(() => {
-            // Log occasionally to show it's alive
-            // console.error(`${packageName}: Keep-alive interval tick.`);
-        }, 60000); // Use a 1-minute interval
+            // Empty function - existence keeps the event loop busy
+        }, 60000); // 1-minute interval
 
         console.error(`${packageName}: Process should remain active indefinitely.`);
     }
