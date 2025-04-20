@@ -8,19 +8,20 @@ const readline = require('readline');
 
 // --- Configuration ---
 const packageName = 'linkedin-mcp-runner'; // Used for messages
-const backendApiUrl =
-  "https://staging.btensai.com/api/mcp/publish-linkedin-post";
+const backendApiUrl = 'https://staging.btensai.com/api/mcp/publish-linkedin-post'; // <<< Updated backend URL
 
-// Get the actual package name from package.json for the setup command
+// Get the actual package name and version from package.json
 let publishedPackageName = packageName; // Default
+let packageVersion = '0.0.0'; // Default
 try {
   const pkgJsonPath = path.join(__dirname, 'package.json');
   if (fs.existsSync(pkgJsonPath)) {
     const pkg = require(pkgJsonPath);
     publishedPackageName = pkg.name || packageName;
+    packageVersion = pkg.version || packageVersion;
   }
 } catch (e) {
-  console.error(`${packageName}: Warning - Could not read package.json to confirm published name. Using default.`);
+  console.error(`${packageName}: Warning - Could not read package.json. Using defaults.`);
 }
 // --- End Configuration ---
 
@@ -29,230 +30,154 @@ try {
 function getConfigPath() {
     const platform = os.platform();
     switch (platform) {
-        case 'darwin': // macOS
+        case 'darwin':
             return path.join(os.homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
-        case 'win32': // Windows
+        case 'win32':
             if (!process.env.APPDATA) {
-                console.error("Error: APPDATA environment variable not found. Cannot locate config file on Windows.");
-                process.exit(1);
+                console.error("Error: APPDATA environment variable not found."); process.exit(1);
             }
             return path.join(process.env.APPDATA, 'Claude', 'claude_desktop_config.json');
-        case 'linux': // Linux
-            // Linux path might vary, use common default but mention others
-             const standardPath = path.join(os.homedir(), '.config', 'Claude', 'claude_desktop_config.json');
-             // Add checks for snap/flatpak if necessary in the future
-             return standardPath;
+        case 'linux':
+             return path.join(os.homedir(), '.config', 'Claude', 'claude_desktop_config.json');
         default:
-            console.error(`Error: Unsupported platform for setup: ${platform}`);
-            process.exit(1);
+            console.error(`Error: Unsupported platform: ${platform}`); process.exit(1);
     }
 }
-
-// Function to parse command line arguments for the API key
 function parseApiKeyArg(args) {
     const apiKeyIndex = args.indexOf('--api-key');
-    if (apiKeyIndex !== -1 && apiKeyIndex + 1 < args.length) {
-        return args[apiKeyIndex + 1];
-    }
+    if (apiKeyIndex !== -1 && apiKeyIndex + 1 < args.length) { return args[apiKeyIndex + 1]; }
     return null;
 }
-
 async function runSetup(apiKeyFromArg) {
     console.log(`Running ${packageName} setup...`);
     const configPath = getConfigPath();
     console.log(`Target Claude config file: ${configPath}`);
-
     let configData = {};
     try {
-        if (await fs.pathExists(configPath)) {
-            console.log("Reading existing configuration file...");
-            configData = await fs.readJson(configPath);
-            console.log("Existing configuration read successfully.");
-        } else {
-            console.log("Configuration file does not exist. Creating default structure.");
-        }
-    } catch (err) {
-        console.error(`Error reading configuration file at ${configPath}. It might be corrupted.`, err);
-        console.error("Please check the file or delete it to allow recreation.");
-        process.exit(1);
-    }
-
-    // Ensure mcpServers key exists
-    if (!configData.mcpServers) {
-        console.log("Adding 'mcpServers' section to configuration...");
-        configData.mcpServers = {};
-    } else {
-         console.log("'mcpServers' section found.");
-    }
-
-    // Determine the API key value to use
+        if (await fs.pathExists(configPath)) { configData = await fs.readJson(configPath); }
+    } catch (err) { console.error(`Error reading config: ${err}`); process.exit(1); }
+    if (!configData.mcpServers) { configData.mcpServers = {}; }
     const apiKeyToUse = apiKeyFromArg || "PASTE_YOUR_API_KEY_HERE";
-    if (apiKeyFromArg) {
-        console.log("Using API key provided via --api-key argument.");
-    } else {
-        console.log("API key not provided via argument. Using placeholder.");
-    }
-
-    // Add or update the LinkedIn server entry
-    const serverKey = 'linkedin';
-    console.log(`Adding/Updating '${serverKey}' entry in 'mcpServers'...`);
-    configData.mcpServers[serverKey] = {
-        command: "npx",
-        args: [
-            "-y",
-            publishedPackageName
-        ],
-        env: {
-            "LINKEDIN_MCP_API_KEY": apiKeyToUse
-        }
+    configData.mcpServers['linkedin'] = {
+        command: "npx", args: ["-y", publishedPackageName],
+        env: { "LINKEDIN_MCP_API_KEY": apiKeyToUse }
     };
-
-    // Write the updated configuration back
     try {
-        console.log("Writing updated configuration back to file...");
         await fs.ensureDir(path.dirname(configPath));
         await fs.writeJson(configPath, configData, { spaces: 2 });
-        console.log("Configuration updated successfully!");
+        console.log("Configuration updated!");
         console.log("\n----------------------------------------------------------");
         if (apiKeyFromArg) {
-            console.log("SUCCESS! LinkedIn MCP Server configured with your API key.");
-            console.log("Please restart the Claude Desktop app for changes to take effect.");
+            console.log("SUCCESS! Restart Claude Desktop app.");
         } else {
-            console.log("IMPORTANT ACTION REQUIRED:");
-            console.log(`Please open the file: ${configPath}`);
-            console.log(`Find the 'linkedin' server entry under 'mcpServers'.`);
-            console.log("Replace 'PASTE_YOUR_API_KEY_HERE' with your actual LinkedIn MCP API Key.");
-            console.log("After adding your API key, restart the Claude Desktop app.");
+            console.log("ACTION REQUIRED: Open file and PASTE YOUR API KEY:");
+            console.log(configPath);
+            console.log("Then restart Claude Desktop app.");
         }
         console.log("----------------------------------------------------------\n");
-
-    } catch (err) {
-        console.error(`Error writing configuration file to ${configPath}.`, err);
-        console.error("Please check file permissions and disk space.");
-        process.exit(1);
-    }
+    } catch (err) { console.error(`Error writing config: ${err}`); process.exit(1); }
 }
 // --- End Setup Functions ---
 
 
 // --- MCP Server Functions (Pure Node.js) ---
 
-// Function to send a JSON-RPC response
 function sendResponse(response) {
   const responseString = JSON.stringify(response);
-  console.log(responseString); // Write to stdout, MCP expects newline delimited
+  console.log(responseString);
 }
 
-// Function to handle incoming requests
 async function handleRequest(request) {
-  // Simple validation
-  if (!request || typeof request !== 'object' || request.jsonrpc !== '2.0' || !request.id || typeof request.method !== 'string') {
-    sendResponse({ jsonrpc: "2.0", error: { code: -32600, message: "Invalid Request" }, id: request.id || null });
-    return;
+  if (!request || typeof request !== 'object' || request.jsonrpc !== '2.0' || !request.id === undefined || typeof request.method !== 'string') {
+    // Note: Allow request.id to be 0 or null for notifications, but spec says it SHOULD exist for requests requiring response.
+    // Let's be strict for now and require non-null id for non-notification methods.
+     const id = request?.id ?? null; // Use provided id or null
+     if(id !== null && request?.method !== 'initialize') { // Allow initialize without strict id check just in case, but respond if possible
+         sendResponse({ jsonrpc: "2.0", error: { code: -32600, message: "Invalid Request Structure" }, id });
+         return;
+     }
+     // If it's potentially a notification or malformed, we might just ignore or log.
+     // For now, let's focus on handling valid requests.
+     if(id === null && request?.method !== 'initialize') return; // Ignore notifications for now
   }
 
   const { method, params, id } = request;
 
+  // --- Handle Initialize Method --- <<< NEW
+  if (method === 'initialize') {
+      sendResponse({
+          jsonrpc: "2.0",
+          id: id, // Echo back the request id (should be 0)
+          result: {
+              capabilities: { /* Define any specific capabilities here if needed */ },
+              serverInfo: {
+                  name: publishedPackageName,
+                  version: packageVersion
+              }
+          }
+      });
+      return; // Initialization complete
+  }
+  // --- End Handle Initialize Method ---
+
+  // --- Handle publish_linkedin_post Method ---
   if (method === 'publish_linkedin_post') {
     const apiKey = process.env.LINKEDIN_MCP_API_KEY;
     const postText = params?.post_text;
 
     if (!apiKey) {
-      sendResponse({ jsonrpc: "2.0", error: { code: -32001, message: "Server Configuration Error: LINKEDIN_MCP_API_KEY environment variable not set." }, id });
+      sendResponse({ jsonrpc: "2.0", error: { code: -32001, message: "Server Configuration Error: API Key not set." }, id });
       return;
     }
     if (typeof postText !== 'string' || postText.trim() === '') {
-      sendResponse({ jsonrpc: "2.0", error: { code: -32602, message: "Invalid params: 'post_text' parameter is required and must be a non-empty string." }, id });
+      sendResponse({ jsonrpc: "2.0", error: { code: -32602, message: "Invalid params: 'post_text' required." }, id });
       return;
     }
 
     try {
-      const headers = {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "Accept": "application/json" // Good practice to specify accept header
-      };
-      const payload = {
-        "post_text": postText
-      };
+      const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Accept": "application/json" };
+      const payload = { "post_text": postText };
+      const apiResponse = await axios.post(backendApiUrl, payload, { headers, timeout: 30000 });
 
-      // console.error(`${packageName}: Sending request to backend: ${backendApiUrl} with text: ${postText.substring(0, 30)}...`);
-      const apiResponse = await axios.post(backendApiUrl, payload, {
-         headers,
-         timeout: 30000 // 30 second timeout
-      });
-
-
-      // Assuming the backend API responds with JSON, check for its success/error structure
        if (apiResponse.data && apiResponse.data.success) {
-           // Send success response back to MCP client
             sendResponse({ jsonrpc: "2.0", result: "✅ Successfully published post to LinkedIn.", id });
        } else {
-           // Forward the error from the backend API if available, otherwise generic message
-           const errorMessage = apiResponse.data?.error || "Backend API indicated failure but provided no specific error message.";
+           const errorMessage = apiResponse.data?.error || "Backend API Error (no detail)";
            sendResponse({ jsonrpc: "2.0", error: { code: -32002, message: `Backend API Error: ${errorMessage}` }, id });
        }
 
     } catch (error) {
-      // console.error(`${packageName}: Error calling backend API:`, error);
-      let errorCode = -32000; // Default server error
+      let errorCode = -32000;
       let errorMessage = `Failed to call backend API: ${error.message}`;
-
       if (error.response) {
-        // The request was made and the server responded with a status code not in 2xx range
-        errorMessage = `Backend API responded with status ${error.response.status}.`;
-        // Include response body if possible and seems helpful (limit size)
-        let responseBody = '';
-         try { responseBody = JSON.stringify(error.response.data).substring(0, 200) + '...'; } catch { responseBody = '[Non-JSON response]'; }
-         errorMessage += ` Body: ${responseBody}`;
-         // Map HTTP errors to JSON-RPC potentially?
-         if (error.response.status === 401 || error.response.status === 403) {
-             errorCode = -32001; // Auth related error
-             errorMessage = `Backend API Authentication/Authorization Error (Status ${error.response.status}). Check API Key.`;
-         } else if (error.response.status === 400) {
-             errorCode = -32602; // Invalid params often map to 400
-             errorMessage = `Backend API reported Invalid Request (Status 400). Detail: ${responseBody}`;
-         }
-
+        errorMessage = `Backend API Error (Status ${error.response.status})`;
+         if (error.response.status === 401 || error.response.status === 403) { errorCode = -32001; }
+         else if (error.response.status === 400) { errorCode = -32602; }
       } else if (error.request) {
-        // The request was made but no response was received
-        errorMessage = "No response received from backend API (check network/firewall/server status).";
-        errorCode = -32003; // Connection error
+        errorMessage = "No response received from backend API.";
+        errorCode = -32003;
       }
-      // else: Something happened in setting up the request
-
       sendResponse({ jsonrpc: "2.0", error: { code: errorCode, message: errorMessage }, id });
     }
+  // --- End Handle publish_linkedin_post Method ---
 
   } else {
-    // Method not found
-    sendResponse({ jsonrpc: "2.0", error: { code: -32601, message: "Method not found" }, id });
+    // Method not found for any other methods
+    sendResponse({ jsonrpc: "2.0", error: { code: -32601, message: `Method not found: ${method}` }, id });
   }
 }
 
-// Function to start the MCP server listener
 function startMcpServer() {
-    // console.error(`${packageName}: Starting MCP server in Node.js mode...`);
-
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-      terminal: false // Important: treat stdin/stdout as streams, not interactive terminal
-    });
-
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: false });
     rl.on('line', (line) => {
       try {
         const request = JSON.parse(line);
-        handleRequest(request); // handleRequest is async but we don't wait here - process requests independently
+        handleRequest(request);
       } catch (e) {
         sendResponse({ jsonrpc: "2.0", error: { code: -32700, message: "Parse error" }, id: null });
       }
     });
-
-    rl.on('close', () => {
-      process.exit(0);
-    });
-
+    rl.on('close', () => { process.exit(0); });
 }
 // --- End MCP Server Functions ---
 
@@ -260,18 +185,15 @@ function startMcpServer() {
 // --- Main Execution Logic ---
 async function main() {
     const args = process.argv.slice(2);
-
     if (args.length > 0 && args[0].toLowerCase() === 'setup') {
-        // Pass remaining args to runSetup to check for --api-key
-        const apiKey = parseApiKeyArg(args.slice(1)); // Pass args *after* 'setup'
+        const apiKey = parseApiKeyArg(args.slice(1));
         await runSetup(apiKey);
     } else {
-        // Run the MCP server directly in this Node.js process
         startMcpServer();
     }
 }
 
 main().catch(err => {
-    console.error(`${packageName}: Unhandled error in main function:`, err);
+    console.error(`${packageName}: Unhandled error:`, err);
     process.exit(1);
 }); 
