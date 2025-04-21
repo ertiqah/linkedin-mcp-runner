@@ -69,4 +69,23 @@ Whether you used the automated or manual setup, **you must restart the Claude De
 
 ## Usage
 
-Once set up and Claude is restarted, you should be able to use the `publish_linkedin_post` tool within Claude to post updates to your connected LinkedIn profile.
+Once the tool is set up and Claude is restarted, you can ask Claude to publish posts to your LinkedIn profile.
+
+**Basic Posting:**
+Simply tell Claude what text you want to post.
+
+*Example:* `"Hey Claude, please post this to my LinkedIn: 'Excited to share our latest company news!'"`
+
+**Posting with an Image or Video:**
+
+You can also include one or more images or a video in your post. To do this:
+
+1.  **Upload your image/video** to an online hosting service that provides **direct links**. A popular free option is [Postimages](https://postimg.cc/). Make sure you get the "Direct Link" after uploading.
+2.  **Provide both the post text and the direct link(s)** to Claude.
+
+*Example:* `"Hi Claude, can you publish the following to my LinkedIn profile, including the image?"`
+
+*   *Post Text:* "Check out the highlights from our team event last week!"
+*   *Image URL:* `https://i.postimg.cc/your-image-code.jpg`
+
+Claude will then use the `publish_linkedin_post` tool with your text and the media URL you provided.
