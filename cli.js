@@ -9,6 +9,7 @@ const readline = require('readline');
 // Configuration
 const packageName = 'linkedin-mcp-runner';
 const backendApiUrl = 'https://staging.btensai.com/api/mcp/publish-linkedin-post';
+const backendScheduleApiUrl = 'https://staging.btensai.com/api/mcp/schedule-linkedin-post';
 
 // Get the actual package name and version from package.json
 let publishedPackageName = packageName;
@@ -221,6 +222,105 @@ async function handleRequest(request) {
                 id 
               });
           }
+      } else if (name === 'schedule_linkedin_post') {
+          console.error(`${packageName}: Received call for schedule_linkedin_post tool.`);
+          const apiKey = process.env.LINKEDIN_MCP_API_KEY;
+          const postText = args?.post_text;
+          const scheduledDate = args?.scheduled_date;
+          const media = args?.media;
+
+          if (!apiKey) {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32001, message: "Server Configuration Error: API Key not set." }, id });
+              return;
+          }
+          if (typeof postText !== 'string' || postText.trim() === '') {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32602, message: "Invalid arguments: 'post_text' (string) required." }, id });
+              return;
+          }
+          if (typeof scheduledDate !== 'string' || scheduledDate.trim() === '') {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32602, message: "Invalid arguments: 'scheduled_date' (ISO 8601 string) required." }, id });
+              return;
+          }
+          if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(scheduledDate)) {
+             sendResponse({ jsonrpc: "2.0", error: { code: -32602, message: "Invalid arguments: 'scheduled_date' must be a valid ISO 8601 string (e.g., 2025-12-31T10:00:00Z)." }, id });
+             return;
+           }
+          if (media && (!Array.isArray(media) || media.some(item => !item || typeof item !== 'object' || typeof item.file_url !== 'string' || typeof item.filename !== 'string'))) {
+               sendResponse({ jsonrpc: "2.0", error: { code: -32602, message: "Invalid arguments: 'media' must be an array of objects, each with 'file_url' and 'filename' strings." }, id });
+               return;
+          }
+
+          try {
+              const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Accept": "application/json" };
+              const payload = {
+                "post_text": postText,
+                "scheduled_date": scheduledDate,
+                "media": media || []
+               };
+              console.error(`${packageName}: Calling backend schedule API: ${backendScheduleApiUrl} with payload:`, JSON.stringify(payload, null, 2));
+              const apiResponse = await axios.post(backendScheduleApiUrl, payload, { headers, timeout: 60000 });
+              console.error(`${packageName}: Backend schedule API response status: ${apiResponse.status}`);
+              console.error(`${packageName}: Backend schedule API response data:`, JSON.stringify(apiResponse.data, null, 2));
+
+              if (apiResponse.data && apiResponse.data.success) {
+                   const scheduleDetails = apiResponse.data.scheduled_job_id ?
+                     ` (Scheduled Job ID: ${apiResponse.data.scheduled_job_id})` : '';
+                   sendResponse({
+                     jsonrpc: "2.0",
+                     result: {
+                       content: [
+                         {
+                           type: "text",
+                           text: `✅ Successfully scheduled post for LinkedIn${scheduleDetails}.`
+                         }
+                       ],
+                       isError: false
+                     },
+                     id
+                   });
+              } else {
+                  const errorMessage = apiResponse.data?.error || "Backend API Error (no detail)";
+                  console.error(`${packageName}: Backend Schedule API Error: ${errorMessage}`);
+                  sendResponse({
+                    jsonrpc: "2.0",
+                    result: {
+                      content: [
+                        {
+                          type: "text",
+                          text: `Failed to schedule post for LinkedIn: ${errorMessage}`
+                        }
+                      ],
+                      isError: true // Indicate tool execution error
+                    },
+                    id
+                  });
+              }
+
+          } catch (error) {
+              let errorMessage = `Failed to call backend schedule API: ${error.message}`;
+              if (error.response) {
+                  const backendError = error.response.data?.error;
+                  errorMessage = backendError ? `Backend API Error: ${backendError}` : `Backend API Error (Status ${error.response.status})`;
+                  console.error(`${packageName}: Backend Schedule API Error Response:`, error.response.data);
+              } else if (error.request) {
+                  errorMessage = "No response received from backend schedule API.";
+              }
+              console.error(`${packageName}: ${errorMessage}`);
+
+              sendResponse({
+                jsonrpc: "2.0",
+                result: {
+                  content: [
+                    {
+                      type: "text",
+                      text: `Failed to schedule post for LinkedIn: ${errorMessage}`
+                    }
+                  ],
+                  isError: true // Indicate tool execution error
+                },
+                id
+              });
+          }
       } else {
           console.error(`${packageName}: Received tools/call for unknown tool: ${name}`);
           sendResponse({ jsonrpc: "2.0", error: { code: -32601, message: `Tool not found: ${name}` }, id });
@@ -266,6 +366,42 @@ async function handleRequest(request) {
                               }
                           },
                           required: ["post_text"]
+                      }
+                  },
+                  {
+                      name: "schedule_linkedin_post",
+                      description: "Schedule a text post for LinkedIn at a specific future date and time, optionally including media (images/videos) specified by URL.",
+                      inputSchema: {
+                          type: "object",
+                          properties: {
+                              post_text: {
+                                  type: "string",
+                                  description: "The text content of the LinkedIn post to be scheduled."
+                              },
+                              scheduled_date: {
+                                  type: "string",
+                                  description: "The date and time to publish the post, in ISO 8601 format (e.g., '2025-12-31T10:00:00Z' or '2025-12-31T15:30:00+05:30'). Must be in the future."
+                              },
+                              media: {
+                                  type: "array",
+                                  description: "Optional. A list of media items to attach to the post. Each item must have a 'file_url' pointing to a direct image or video URL and a 'filename'.",
+                                  items: {
+                                      type: "object",
+                                      properties: {
+                                          file_url: {
+                                              type: "string",
+                                              description: "A direct URL to the image or video file (e.g., ending in .jpg, .png, .mp4)."
+                                          },
+                                          filename: {
+                                              type: "string",
+                                              description: "A filename for the media item (e.g., 'meeting_notes.mp4')."
+                                          }
+                                      },
+                                      required: ["file_url", "filename"]
+                                  }
+                              }
+                          },
+                          required: ["post_text", "scheduled_date"]
                       }
                   }
               ]
