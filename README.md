@@ -1,6 +1,6 @@
 # LinkedIn MCP Runner by Ertiqah, LLC
 
-This package allows you to interact with your LinkedIn account (primarily for posting & scheduling posts) using the Claude Desktop Application. 
+This package allows you to interact with your LinkedIn and Twitter accounts (primarily for posting & scheduling posts) using the Claude Desktop Application. 
 
 ## Setup Instructions
 
@@ -11,7 +11,7 @@ Follow these steps to integrate this tool with your Claude Desktop app:
 1.  Log in to your account at [ligo.ertiqah.com](https://ligo.ertiqah.com/).
 2.  Navigate to the Settings page: [ligo.ertiqah.com/settings#generatekey](https://ligo.ertiqah.com/settings#generatekey)
 3.  Click the button to generate a new API key.
-4.  Follow the prompts to connect your LinkedIn profile if you haven't already.
+4.  Follow the prompts to connect your LinkedIn and/or Twitter profiles if you haven't already.
 5.  **Copy the generated API key.** Keep it safe, you'll need it in the next step.
 
 **Step 2: Configure Claude Desktop App**
@@ -69,7 +69,9 @@ Whether you used the automated or manual setup, **you must restart the Claude De
 
 ## Usage
 
-Once the tool is set up and Claude is restarted, you can ask Claude to publish posts to your LinkedIn profile.
+Once the tool is set up and Claude is restarted, you can ask Claude to publish posts to your LinkedIn profile or tweets to your Twitter account.
+
+### LinkedIn Usage
 
 **Basic Posting:**
 Simply tell Claude what text you want to post.
@@ -89,3 +91,14 @@ You can also include one or more images or a video in your post. To do this:
 *   *Image URL:* `https://i.postimg.cc/your-image-code.jpg`
 
 Claude will then use the `publish_linkedin_post` tool with your text and the media URL you provided.
+
+### Twitter Usage
+
+**Posting a Tweet:**
+Simply tell Claude what you want to tweet.
+
+*Example:* `"Hey Claude, please tweet this for me: 'Just launched our new product! Check it out at ligo.ertiqah.com'"`
+
+Claude will use the `publish_twitter_post` tool to send your tweet text to Twitter.
+
+Note: Make sure your Twitter account is properly connected in your ligo.ertiqah.com account settings to enable this functionality.

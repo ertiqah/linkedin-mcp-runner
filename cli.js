@@ -10,6 +10,7 @@ const readline = require('readline');
 const packageName = 'linkedin-mcp-runner';
 const backendApiUrl = 'https://staging.btensai.com/api/mcp/publish-linkedin-post';
 const backendScheduleApiUrl = 'https://staging.btensai.com/api/mcp/schedule-linkedin-post';
+const backendTwitterApiUrl = 'https://staging.btensai.com/api/mcp/publish-twitter-post';
 
 // Get the actual package name and version from package.json
 let publishedPackageName = packageName;
@@ -321,6 +322,93 @@ async function handleRequest(request) {
                 id
               });
           }
+      } else if (name === 'publish_twitter_post') {
+          console.error(`${packageName}: Received call for publish_twitter_post tool.`);
+          const apiKey = process.env.LINKEDIN_MCP_API_KEY;
+          const postText = args?.post_text;
+
+          if (!apiKey) {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32001, message: "Server Configuration Error: API Key not set." }, id });
+              return;
+          }
+          if (typeof postText !== 'string' || postText.trim() === '') {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32602, message: "Invalid arguments: 'post_text' (string) required." }, id });
+              return;
+          }
+
+          try {
+              const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Accept": "application/json" };
+              const payload = { 
+                "post_text": postText
+              };
+              console.error(`${packageName}: Calling Twitter API: ${backendTwitterApiUrl} with payload:`, JSON.stringify(payload, null, 2));
+              const apiResponse = await axios.post(backendTwitterApiUrl, payload, { headers, timeout: 60000 });
+              console.error(`${packageName}: Twitter API response status: ${apiResponse.status}`);
+              console.error(`${packageName}: Twitter API response data:`, JSON.stringify(apiResponse.data, null, 2));
+
+              if (apiResponse.data && apiResponse.data.success) {
+                  // Include tweet_id from backend if available
+                  const tweetDetails = apiResponse.data.tweet_id ? 
+                    ` (Tweet ID: ${apiResponse.data.tweet_id})` : '';
+                  
+                  sendResponse({ 
+                    jsonrpc: "2.0", 
+                    result: { 
+                      content: [
+                        {
+                          type: "text",
+                          text: `✅ Successfully published tweet to Twitter${tweetDetails}.`
+                        }
+                      ],
+                      isError: false
+                    }, 
+                    id 
+                  });
+              } else {
+                  const errorMessage = apiResponse.data?.error || "Backend API Error (no detail)";
+                  console.error(`${packageName}: Twitter API Error: ${errorMessage}`);
+                  // Report error within the result object
+                  sendResponse({ 
+                    jsonrpc: "2.0", 
+                    result: {
+                      content: [
+                        {
+                          type: "text",
+                          text: `Failed to publish tweet to Twitter: ${errorMessage}`
+                        }
+                      ],
+                      isError: true
+                    }, 
+                    id 
+                  });
+              }
+
+          } catch (error) {
+              let errorMessage = `Failed to call Twitter API: ${error.message}`;
+              // Determine a user-facing error message based on the error type
+              if (error.response) {
+                  errorMessage = `Twitter API Error (Status ${error.response.status})`;
+                  console.error(`${packageName}: Twitter API Error Response:`, error.response.data); 
+              } else if (error.request) {
+                  errorMessage = "No response received from Twitter API.";
+              }
+              console.error(`${packageName}: ${errorMessage}`);
+              
+              // Report error within the result object
+              sendResponse({ 
+                jsonrpc: "2.0", 
+                result: { 
+                  content: [
+                    {
+                      type: "text",
+                      text: `Failed to publish tweet to Twitter: ${errorMessage}`
+                    }
+                  ],
+                  isError: true
+                }, 
+                id 
+              });
+          }
       } else {
           console.error(`${packageName}: Received tools/call for unknown tool: ${name}`);
           sendResponse({ jsonrpc: "2.0", error: { code: -32601, message: `Tool not found: ${name}` }, id });
@@ -402,6 +490,20 @@ async function handleRequest(request) {
                               }
                           },
                           required: ["post_text", "scheduled_date"]
+                      }
+                  },
+                  {
+                      name: "publish_twitter_post",
+                      description: "Publish a text post (tweet) to Twitter.",
+                      inputSchema: {
+                          type: "object",
+                          properties: {
+                              post_text: {
+                                  type: "string",
+                                  description: "The text content of the tweet (maximum 280 characters)."
+                              }
+                          },
+                          required: ["post_text"]
                       }
                   }
               ]
