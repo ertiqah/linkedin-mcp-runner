@@ -8,9 +8,16 @@ const readline = require('readline');
 
 // Configuration
 const packageName = 'linkedin-mcp-runner';
-const backendApiUrl = 'https://staging.btensai.com/api/mcp/publish-linkedin-post';
-const backendScheduleApiUrl = 'https://staging.btensai.com/api/mcp/schedule-linkedin-post';
-const backendTwitterApiUrl = 'https://staging.btensai.com/api/mcp/publish-twitter-post';
+const backendApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/publish-linkedin-post';
+const backendScheduleApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/schedule-linkedin-post';
+const backendTwitterApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/publish-twitter-post';
+const backendAnalyzeChatApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/analyze-linkedin-chat';
+const backendGeneratePostApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/generate-linkedin-post';
+const backendLinkedinPostsApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/linkedin/posts';
+const backendLinkedinProfileApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/linkedin/profile';
+const backendLinkedinSetUrlApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/linkedin/set-url';
+const backendLinkedinRefreshProfileApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/linkedin/refresh-profile';
+const backendLinkedinRefreshPostsApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/linkedin/refresh-posts';
 
 // Get the actual package name and version from package.json
 let publishedPackageName = packageName;
@@ -409,6 +416,617 @@ async function handleRequest(request) {
                 id 
               });
           }
+      } else if (name === 'analyze_linkedin_chat') {
+          console.error(`${packageName}: Received call for analyze_linkedin_chat tool.`);
+          const apiKey = process.env.LINKEDIN_MCP_API_KEY;
+          const query = args?.query;
+          const conversationHistory = args?.conversation_history || [];
+
+          if (!apiKey) {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32001, message: "Server Configuration Error: API Key not set." }, id });
+              return;
+          }
+          if (typeof query !== 'string' || query.trim() === '') {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32602, message: "Invalid arguments: 'query' (string) required." }, id });
+              return;
+          }
+          if (!Array.isArray(conversationHistory)) {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32602, message: "Invalid arguments: 'conversation_history' must be an array." }, id });
+              return;
+          }
+
+          try {
+              const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Accept": "application/json" };
+              const payload = { 
+                "query": query,
+                "conversation_history": conversationHistory
+              };
+              console.error(`${packageName}: Calling analyze chat API: ${backendAnalyzeChatApiUrl} with payload:`, JSON.stringify(payload, null, 2));
+              const apiResponse = await axios.post(backendAnalyzeChatApiUrl, payload, { headers, timeout: 60000 });
+              console.error(`${packageName}: Analyze chat API response status: ${apiResponse.status}`);
+              console.error(`${packageName}: Analyze chat API response data:`, JSON.stringify(apiResponse.data, null, 2));
+
+              if (apiResponse.data && apiResponse.data.reply) {
+                  sendResponse({ 
+                    jsonrpc: "2.0", 
+                    result: { 
+                      content: [
+                        {
+                          type: "text",
+                          text: apiResponse.data.reply
+                        }
+                      ],
+                      isError: false
+                    }, 
+                    id 
+                  });
+              } else {
+                  const errorMessage = apiResponse.data?.error || "Backend API Error (no detail)";
+                  console.error(`${packageName}: Analyze chat API Error: ${errorMessage}`);
+                  sendResponse({ 
+                    jsonrpc: "2.0", 
+                    result: {
+                      content: [
+                        {
+                          type: "text",
+                          text: `Failed to analyze LinkedIn chat: ${errorMessage}`
+                        }
+                      ],
+                      isError: true
+                    }, 
+                    id 
+                  });
+              }
+
+          } catch (error) {
+              let errorMessage = `Failed to call analyze chat API: ${error.message}`;
+              if (error.response) {
+                  errorMessage = `Backend API Error (Status ${error.response.status})`;
+                  console.error(`${packageName}: Analyze chat API Error Response:`, error.response.data); 
+              } else if (error.request) {
+                  errorMessage = "No response received from analyze chat API.";
+              }
+              console.error(`${packageName}: ${errorMessage}`);
+              
+              sendResponse({ 
+                jsonrpc: "2.0", 
+                result: { 
+                  content: [
+                    {
+                      type: "text",
+                      text: `Failed to analyze LinkedIn chat: ${errorMessage}`
+                    }
+                  ],
+                  isError: true
+                }, 
+                id 
+              });
+          }
+      } else if (name === 'generate_linkedin_post') {
+          console.error(`${packageName}: Received call for generate_linkedin_post tool.`);
+          const apiKey = process.env.LINKEDIN_MCP_API_KEY;
+          const content = args?.content;
+          const contentType = args?.content_type || 'article';
+
+          if (!apiKey) {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32001, message: "Server Configuration Error: API Key not set." }, id });
+              return;
+          }
+          if (typeof content !== 'string' || content.trim() === '') {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32602, message: "Invalid arguments: 'content' (string) required." }, id });
+              return;
+          }
+
+          try {
+              const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Accept": "application/json" };
+              const payload = { 
+                "content": content,
+                "contentType": contentType
+              };
+              console.error(`${packageName}: Calling generate post API: ${backendGeneratePostApiUrl} with payload:`, JSON.stringify(payload, null, 2));
+              const apiResponse = await axios.post(backendGeneratePostApiUrl, payload, { headers, timeout: 60000 });
+              console.error(`${packageName}: Generate post API response status: ${apiResponse.status}`);
+              console.error(`${packageName}: Generate post API response data:`, JSON.stringify(apiResponse.data, null, 2));
+
+              if (apiResponse.data && apiResponse.data.success) {
+                  if (apiResponse.data.variants && Array.isArray(apiResponse.data.variants)) {
+                      // Handle the case where we get an array of variant posts
+                      const variants = apiResponse.data.variants;
+                      
+                      // Create content items - first a text description, then one item for each variant
+                      const contentItems = [
+                          {
+                              type: "text",
+                              text: `Generated ${variants.length} LinkedIn post variants:`
+                          }
+                      ];
+                      
+                      // Add each variant as a separate text item for better formatting
+                      variants.forEach((variant, index) => {
+                          contentItems.push({
+                              type: "text",
+                              text: `Option ${index + 1}:\n${variant}`
+                          });
+                      });
+                      
+                      sendResponse({ 
+                          jsonrpc: "2.0", 
+                          result: { 
+                              content: contentItems,
+                              isError: false
+                          }, 
+                          id 
+                      });
+                  } else {
+                      // Fallback for backward compatibility
+                      sendResponse({ 
+                          jsonrpc: "2.0", 
+                          result: { 
+                              content: [
+                                  {
+                                      type: "text",
+                                      text: apiResponse.data.message || "Successfully generated LinkedIn post, but no variants were returned. Please check the backend implementation."
+                                  }
+                              ],
+                              isError: false
+                          }, 
+                          id 
+                      });
+                  }
+              } else {
+                  const errorMessage = apiResponse.data?.error || "Backend API Error (no detail)";
+                  console.error(`${packageName}: Generate post API Error: ${errorMessage}`);
+                  sendResponse({ 
+                    jsonrpc: "2.0", 
+                    result: {
+                      content: [
+                        {
+                          type: "text",
+                          text: `Failed to generate LinkedIn post: ${errorMessage}`
+                        }
+                      ],
+                      isError: true
+                    }, 
+                    id 
+                  });
+              }
+
+          } catch (error) {
+              let errorMessage = `Failed to call generate post API: ${error.message}`;
+              if (error.response) {
+                  errorMessage = `Backend API Error (Status ${error.response.status})`;
+                  console.error(`${packageName}: Generate post API Error Response:`, error.response.data); 
+              } else if (error.request) {
+                  errorMessage = "No response received from generate post API.";
+              }
+              console.error(`${packageName}: ${errorMessage}`);
+              
+              sendResponse({ 
+                jsonrpc: "2.0", 
+                result: { 
+                  content: [
+                    {
+                      type: "text",
+                      text: `Failed to generate LinkedIn post: ${errorMessage}`
+                    }
+                  ],
+                  isError: true
+                }, 
+                id 
+              });
+          }
+      } else if (name === 'get_linkedin_posts') {
+          console.error(`${packageName}: Received call for get_linkedin_posts tool.`);
+          const apiKey = process.env.LINKEDIN_MCP_API_KEY;
+          const limit = args?.limit || 5;
+
+          if (!apiKey) {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32001, message: "Server Configuration Error: API Key not set." }, id });
+              return;
+          }
+          if (typeof limit !== 'number' || limit < 1 || limit > 20) {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32602, message: "Invalid arguments: 'limit' must be a number between 1 and 20." }, id });
+              return;
+          }
+
+          try {
+              const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Accept": "application/json" };
+              const payload = { limit };
+              console.error(`${packageName}: Calling LinkedIn posts API: ${backendLinkedinPostsApiUrl} with payload:`, JSON.stringify(payload, null, 2));
+              const apiResponse = await axios.post(backendLinkedinPostsApiUrl, payload, { headers, timeout: 60000 });
+              console.error(`${packageName}: LinkedIn posts API response status: ${apiResponse.status}`);
+              console.error(`${packageName}: LinkedIn posts API response data:`, JSON.stringify(apiResponse.data, null, 2));
+
+              if (apiResponse.data && apiResponse.data.success) {
+                  const posts = apiResponse.data.posts || [];
+                  const formattedPosts = posts.map(post => ({
+                      text: post.text,
+                      postedDate: post.postedDate,
+                      postUrl: post.post_url,
+                      reactions: post.total_reactions_count,
+                      comments: post.comments_count,
+                      reposts: post.reposts_count
+                  }));
+
+                  sendResponse({ 
+                    jsonrpc: "2.0", 
+                    result: { 
+                      content: [
+                        {
+                          type: "text",
+                          text: `Found ${formattedPosts.length} LinkedIn posts. Last updated: ${apiResponse.data.data_last_updated || 'Unknown'}`
+                        },
+                        {
+                          type: "data",
+                          data: formattedPosts
+                        }
+                      ],
+                      isError: false
+                    }, 
+                    id 
+                  });
+              } else {
+                  const errorMessage = apiResponse.data?.error || "Backend API Error (no detail)";
+                  console.error(`${packageName}: LinkedIn posts API Error: ${errorMessage}`);
+                  sendResponse({ 
+                    jsonrpc: "2.0", 
+                    result: {
+                      content: [
+                        {
+                          type: "text",
+                          text: `Failed to get LinkedIn posts: ${errorMessage}. This may occur if you haven't set your LinkedIn URL yet. Try using the set_linkedin_url tool first.`
+                        }
+                      ],
+                      isError: true
+                    }, 
+                    id 
+                  });
+              }
+
+          } catch (error) {
+              let errorMessage = `Failed to call LinkedIn posts API: ${error.message}`;
+              if (error.response) {
+                  const status = error.response.status;
+                  if (status === 404) {
+                      errorMessage = "LinkedIn posts not found. Make sure you've set your LinkedIn URL using set_linkedin_url tool and that the profile is publicly accessible.";
+                  } else if (status === 401 || status === 403) {
+                      errorMessage = "Authentication error. Your API key may be invalid or expired.";
+                  } else {
+                      errorMessage = `Backend API Error (Status ${status}): ${error.response.data?.error || "Unknown error"}`;
+                  }
+                  console.error(`${packageName}: LinkedIn posts API Error Response:`, error.response.data); 
+              } else if (error.request) {
+                  errorMessage = "No response received from LinkedIn posts API. The server may be unavailable or experiencing issues.";
+              }
+              console.error(`${packageName}: ${errorMessage}`);
+              
+              sendResponse({ 
+                jsonrpc: "2.0", 
+                result: { 
+                  content: [
+                    {
+                      type: "text",
+                      text: `Failed to get LinkedIn posts: ${errorMessage}`
+                    }
+                  ],
+                  isError: true
+                }, 
+                id 
+              });
+          }
+      } else if (name === 'get_linkedin_profile') {
+          console.error(`${packageName}: Received call for get_linkedin_profile tool.`);
+          const apiKey = process.env.LINKEDIN_MCP_API_KEY;
+
+          if (!apiKey) {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32001, message: "Server Configuration Error: API Key not set." }, id });
+              return;
+          }
+
+          try {
+              const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Accept": "application/json" };
+              console.error(`${packageName}: Calling LinkedIn profile API: ${backendLinkedinProfileApiUrl}`);
+              const apiResponse = await axios.post(backendLinkedinProfileApiUrl, {}, { headers, timeout: 60000 });
+              console.error(`${packageName}: LinkedIn profile API response status: ${apiResponse.status}`);
+              console.error(`${packageName}: LinkedIn profile API response data:`, JSON.stringify(apiResponse.data, null, 2));
+
+              if (apiResponse.data && apiResponse.data.success) {
+                  const profile = apiResponse.data.profile || {};
+                  sendResponse({ 
+                    jsonrpc: "2.0", 
+                    result: { 
+                      content: [
+                        {
+                          type: "text",
+                          text: `LinkedIn profile data retrieved. Last updated: ${apiResponse.data.data_last_updated || 'Unknown'}`
+                        },
+                        {
+                          type: "data",
+                          data: profile
+                        }
+                      ],
+                      isError: false
+                    }, 
+                    id 
+                  });
+              } else {
+                  const errorMessage = apiResponse.data?.error || "Backend API Error (no detail)";
+                  console.error(`${packageName}: LinkedIn profile API Error: ${errorMessage}`);
+                  sendResponse({ 
+                    jsonrpc: "2.0", 
+                    result: {
+                      content: [
+                        {
+                          type: "text",
+                          text: `Failed to get LinkedIn profile: ${errorMessage}. This may occur if you haven't set your LinkedIn URL yet. Try using the set_linkedin_url tool first.`
+                        }
+                      ],
+                      isError: true
+                    }, 
+                    id 
+                  });
+              }
+
+          } catch (error) {
+              let errorMessage = `Failed to call LinkedIn profile API: ${error.message}`;
+              if (error.response) {
+                  const status = error.response.status;
+                  if (status === 404) {
+                      errorMessage = "LinkedIn profile not found. Make sure you've set your LinkedIn URL using set_linkedin_url tool and that the profile is publicly accessible.";
+                  } else if (status === 401 || status === 403) {
+                      errorMessage = "Authentication error. Your API key may be invalid or expired.";
+                  } else {
+                      errorMessage = `Backend API Error (Status ${status}): ${error.response.data?.error || "Unknown error"}`;
+                  }
+                  console.error(`${packageName}: LinkedIn profile API Error Response:`, error.response.data); 
+              } else if (error.request) {
+                  errorMessage = "No response received from LinkedIn profile API. The server may be unavailable or experiencing issues.";
+              }
+              console.error(`${packageName}: ${errorMessage}`);
+              
+              sendResponse({ 
+                jsonrpc: "2.0", 
+                result: { 
+                  content: [
+                    {
+                      type: "text",
+                      text: `Failed to get LinkedIn profile: ${errorMessage}`
+                    }
+                  ],
+                  isError: true
+                }, 
+                id 
+              });
+          }
+      } else if (name === 'set_linkedin_url') {
+          console.error(`${packageName}: Received call for set_linkedin_url tool.`);
+          const apiKey = process.env.LINKEDIN_MCP_API_KEY;
+          const linkedinUrl = args?.linkedin_url;
+
+          if (!apiKey) {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32001, message: "Server Configuration Error: API Key not set." }, id });
+              return;
+          }
+          if (typeof linkedinUrl !== 'string' || linkedinUrl.trim() === '') {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32602, message: "Invalid arguments: 'linkedin_url' (string) required." }, id });
+              return;
+          }
+
+          try {
+              const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Accept": "application/json" };
+              const payload = { linkedin_url: linkedinUrl };
+              console.error(`${packageName}: Calling set LinkedIn URL API: ${backendLinkedinSetUrlApiUrl} with payload:`, JSON.stringify(payload, null, 2));
+              const apiResponse = await axios.post(backendLinkedinSetUrlApiUrl, payload, { headers, timeout: 60000 });
+              console.error(`${packageName}: Set LinkedIn URL API response status: ${apiResponse.status}`);
+              console.error(`${packageName}: Set LinkedIn URL API response data:`, JSON.stringify(apiResponse.data, null, 2));
+
+              if (apiResponse.data && apiResponse.data.success) {
+                  sendResponse({ 
+                    jsonrpc: "2.0", 
+                    result: { 
+                      content: [
+                        {
+                          type: "text",
+                          text: apiResponse.data.message || "Successfully set LinkedIn URL."
+                        }
+                      ],
+                      isError: false
+                    }, 
+                    id 
+                  });
+              } else {
+                  const errorMessage = apiResponse.data?.error || "Backend API Error (no detail)";
+                  console.error(`${packageName}: Set LinkedIn URL API Error: ${errorMessage}`);
+                  sendResponse({ 
+                    jsonrpc: "2.0", 
+                    result: {
+                      content: [
+                        {
+                          type: "text",
+                          text: `Failed to set LinkedIn URL: ${errorMessage}. Please ensure the URL is a valid LinkedIn profile URL (e.g., https://www.linkedin.com/in/username/).`
+                        }
+                      ],
+                      isError: true
+                    }, 
+                    id 
+                  });
+              }
+
+          } catch (error) {
+              let errorMessage = `Failed to call set LinkedIn URL API: ${error.message}`;
+              if (error.response) {
+                  const status = error.response.status;
+                  if (status === 400) {
+                      errorMessage = "Invalid LinkedIn URL format. Please provide a complete LinkedIn profile URL (e.g., https://www.linkedin.com/in/username/).";
+                  } else if (status === 401 || status === 403) {
+                      errorMessage = "Authentication error. Your API key may be invalid or expired.";
+                  } else {
+                      errorMessage = `Backend API Error (Status ${status}): ${error.response.data?.error || "Unknown error"}`;
+                  }
+                  console.error(`${packageName}: Set LinkedIn URL API Error Response:`, error.response.data); 
+              } else if (error.request) {
+                  errorMessage = "No response received from set LinkedIn URL API. The server may be unavailable or experiencing issues.";
+              }
+              console.error(`${packageName}: ${errorMessage}`);
+              
+              sendResponse({ 
+                jsonrpc: "2.0", 
+                result: { 
+                  content: [
+                    {
+                      type: "text",
+                      text: `Failed to set LinkedIn URL: ${errorMessage}`
+                    }
+                  ],
+                  isError: true
+                }, 
+                id 
+              });
+          }
+      } else if (name === 'refresh_linkedin_profile') {
+          console.error(`${packageName}: Received call for refresh_linkedin_profile tool.`);
+          const apiKey = process.env.LINKEDIN_MCP_API_KEY;
+
+          if (!apiKey) {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32001, message: "Server Configuration Error: API Key not set." }, id });
+              return;
+          }
+
+          try {
+              const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Accept": "application/json" };
+              console.error(`${packageName}: Calling refresh LinkedIn profile API: ${backendLinkedinRefreshProfileApiUrl}`);
+              const apiResponse = await axios.post(backendLinkedinRefreshProfileApiUrl, {}, { headers, timeout: 60000 });
+              console.error(`${packageName}: Refresh LinkedIn profile API response status: ${apiResponse.status}`);
+              console.error(`${packageName}: Refresh LinkedIn profile API response data:`, JSON.stringify(apiResponse.data, null, 2));
+
+              if (apiResponse.data && apiResponse.data.success) {
+                  sendResponse({ 
+                    jsonrpc: "2.0", 
+                    result: { 
+                      content: [
+                        {
+                          type: "text",
+                          text: apiResponse.data.message || "Successfully refreshed LinkedIn profile data."
+                        }
+                      ],
+                      isError: false
+                    }, 
+                    id 
+                  });
+              } else {
+                  const errorMessage = apiResponse.data?.error || "Backend API Error (no detail)";
+                  console.error(`${packageName}: Refresh LinkedIn profile API Error: ${errorMessage}`);
+                  sendResponse({ 
+                    jsonrpc: "2.0", 
+                    result: {
+                      content: [
+                        {
+                          type: "text",
+                          text: `Failed to refresh LinkedIn profile: ${errorMessage}`
+                        }
+                      ],
+                      isError: true
+                    }, 
+                    id 
+                  });
+              }
+
+          } catch (error) {
+              let errorMessage = `Failed to call refresh LinkedIn profile API: ${error.message}`;
+              if (error.response) {
+                  errorMessage = `Backend API Error (Status ${error.response.status})`;
+                  console.error(`${packageName}: Refresh LinkedIn profile API Error Response:`, error.response.data); 
+              } else if (error.request) {
+                  errorMessage = "No response received from refresh LinkedIn profile API.";
+              }
+              console.error(`${packageName}: ${errorMessage}`);
+              
+              sendResponse({ 
+                jsonrpc: "2.0", 
+                result: { 
+                  content: [
+                    {
+                      type: "text",
+                      text: `Failed to refresh LinkedIn profile: ${errorMessage}`
+                    }
+                  ],
+                  isError: true
+                }, 
+                id 
+              });
+          }
+      } else if (name === 'refresh_linkedin_posts') {
+          console.error(`${packageName}: Received call for refresh_linkedin_posts tool.`);
+          const apiKey = process.env.LINKEDIN_MCP_API_KEY;
+
+          if (!apiKey) {
+              sendResponse({ jsonrpc: "2.0", error: { code: -32001, message: "Server Configuration Error: API Key not set." }, id });
+              return;
+          }
+
+          try {
+              const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Accept": "application/json" };
+              console.error(`${packageName}: Calling refresh LinkedIn posts API: ${backendLinkedinRefreshPostsApiUrl}`);
+              const apiResponse = await axios.post(backendLinkedinRefreshPostsApiUrl, {}, { headers, timeout: 60000 });
+              console.error(`${packageName}: Refresh LinkedIn posts API response status: ${apiResponse.status}`);
+              console.error(`${packageName}: Refresh LinkedIn posts API response data:`, JSON.stringify(apiResponse.data, null, 2));
+
+              if (apiResponse.data && apiResponse.data.success) {
+                  sendResponse({ 
+                    jsonrpc: "2.0", 
+                    result: { 
+                      content: [
+                        {
+                          type: "text",
+                          text: apiResponse.data.message || "Successfully refreshed LinkedIn posts data."
+                        }
+                      ],
+                      isError: false
+                    }, 
+                    id 
+                  });
+              } else {
+                  const errorMessage = apiResponse.data?.error || "Backend API Error (no detail)";
+                  console.error(`${packageName}: Refresh LinkedIn posts API Error: ${errorMessage}`);
+                  sendResponse({ 
+                    jsonrpc: "2.0", 
+                    result: {
+                      content: [
+                        {
+                          type: "text",
+                          text: `Failed to refresh LinkedIn posts: ${errorMessage}`
+                        }
+                      ],
+                      isError: true
+                    }, 
+                    id 
+                  });
+              }
+
+          } catch (error) {
+              let errorMessage = `Failed to call refresh LinkedIn posts API: ${error.message}`;
+              if (error.response) {
+                  errorMessage = `Backend API Error (Status ${error.response.status})`;
+                  console.error(`${packageName}: Refresh LinkedIn posts API Error Response:`, error.response.data); 
+              } else if (error.request) {
+                  errorMessage = "No response received from refresh LinkedIn posts API.";
+              }
+              console.error(`${packageName}: ${errorMessage}`);
+              
+              sendResponse({ 
+                jsonrpc: "2.0", 
+                result: { 
+                  content: [
+                    {
+                      type: "text",
+                      text: `Failed to refresh LinkedIn posts: ${errorMessage}`
+                    }
+                  ],
+                  isError: true
+                }, 
+                id 
+              });
+          }
       } else {
           console.error(`${packageName}: Received tools/call for unknown tool: ${name}`);
           sendResponse({ jsonrpc: "2.0", error: { code: -32601, message: `Tool not found: ${name}` }, id });
@@ -504,6 +1122,107 @@ async function handleRequest(request) {
                               }
                           },
                           required: ["post_text"]
+                      }
+                  },
+                  {
+                      name: "analyze_linkedin_chat",
+                      description: "Ask questions about the user's LinkedIn profile, content, or network, with support for multi-turn conversations.",
+                      inputSchema: {
+                          type: "object",
+                          properties: {
+                              query: {
+                                  type: "string",
+                                  description: "The question or request about LinkedIn data to be analyzed."
+                              },
+                              conversation_history: {
+                                  type: "array",
+                                  description: "Optional. Previous messages in the conversation for context. Each message must have 'role' (user/assistant) and 'content' (text).",
+                                  items: {
+                                      type: "object",
+                                      properties: {
+                                          role: {
+                                              type: "string",
+                                              description: "The sender of the message: 'user' or 'assistant'."
+                                          },
+                                          content: {
+                                              type: "string",
+                                              description: "The text content of the message."
+                                          }
+                                      },
+                                      required: ["role", "content"]
+                                  }
+                              }
+                          },
+                          required: ["query"]
+                      }
+                  },
+                  {
+                      name: "generate_linkedin_post",
+                      description: "Generate three LinkedIn post variants from any content (article, newsletter, notes, etc.) to optimize engagement.",
+                      inputSchema: {
+                          type: "object",
+                          properties: {
+                              content: {
+                                  type: "string",
+                                  description: "The source content to transform into LinkedIn posts. Can be articles, emails, newsletters, notes, etc."
+                              },
+                              content_type: {
+                                  type: "string",
+                                  description: "Optional. A short description of the content type (e.g., 'article', 'newsletter', 'notes'). Defaults to 'article'."
+                              }
+                          },
+                          required: ["content"]
+                      }
+                  },
+                  {
+                      name: "get_linkedin_posts",
+                      description: "Retrieve the user's recent LinkedIn posts with engagement metrics.",
+                      inputSchema: {
+                          type: "object",
+                          properties: {
+                              limit: {
+                                  type: "number",
+                                  description: "Optional. Number of posts to retrieve (1-20). Defaults to 5."
+                              }
+                          }
+                      }
+                  },
+                  {
+                      name: "get_linkedin_profile",
+                      description: "Retrieve the user's LinkedIn profile information including headline, summary, experience, and education.",
+                      inputSchema: {
+                          type: "object",
+                          properties: {}
+                      }
+                  },
+                  {
+                      name: "set_linkedin_url",
+                      description: "Set or update the LinkedIn profile URL to analyze. Required before using profile/posts retrieval tools if not set previously.",
+                      inputSchema: {
+                          type: "object",
+                          properties: {
+                              linkedin_url: {
+                                  type: "string",
+                                  description: "The full LinkedIn profile URL (e.g., https://www.linkedin.com/in/username/)"
+                              }
+                          },
+                          required: ["linkedin_url"]
+                      }
+                  },
+                  {
+                      name: "refresh_linkedin_profile",
+                      description: "Force a refresh of the LinkedIn profile data to update any recent changes.",
+                      inputSchema: {
+                          type: "object",
+                          properties: {}
+                      }
+                  },
+                  {
+                      name: "refresh_linkedin_posts",
+                      description: "Force a refresh of LinkedIn posts data to capture recently published content.",
+                      inputSchema: {
+                          type: "object",
+                          properties: {}
                       }
                   }
               ]

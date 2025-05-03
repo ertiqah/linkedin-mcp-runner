@@ -1,7 +1,7 @@
 {
   "name": "linkedin-mcp-runner",
-  "version": "1.4.2",
-  "description": "Downloads and runs the LinkedIn MCP server executable by Ertiqah, LLC.",
+  "version": "1.4.4",
+  "description": "LinkedIn MCP server by LiGo for LinkedIn (Ertiqah, LLC).",
   "main": "cli.js",
   "bin": {
     "linkedin-mcp-runner": "cli.js"
