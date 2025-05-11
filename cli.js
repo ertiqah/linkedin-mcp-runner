@@ -630,7 +630,11 @@ async function handleRequest(request) {
           }
 
           try {
-              const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Accept": "application/json" };
+              const headers = { 
+                "Authorization": `Bearer ${apiKey}`, 
+                "Content-Type": "application/json", 
+                "Accept": "*/*" // Accept any content type
+              };
               const payload = { limit };
               console.error(`${packageName}: Calling LinkedIn posts API: ${backendLinkedinPostsApiUrl} with payload:`, JSON.stringify(payload, null, 2));
               const apiResponse = await axios.post(backendLinkedinPostsApiUrl, payload, { headers, timeout: 60000 });
@@ -638,15 +642,29 @@ async function handleRequest(request) {
               console.error(`${packageName}: LinkedIn posts API response data:`, JSON.stringify(apiResponse.data, null, 2));
 
               if (apiResponse.data && apiResponse.data.success) {
+                  // More flexible posts extraction - handle different response structures
                   const posts = apiResponse.data.posts || [];
-                  const formattedPosts = posts.map(post => ({
-                      text: post.text,
-                      postedDate: post.postedDate,
-                      postUrl: post.post_url,
-                      reactions: post.total_reactions_count,
-                      comments: post.comments_count,
-                      reposts: post.reposts_count
-                  }));
+                  
+                  // Safely map over posts with fallback values for missing properties
+                  const formattedPosts = posts.map(post => {
+                      if (!post) return {}; // Skip null/undefined posts
+                      
+                      return {
+                          text: post.text || '',
+                          postedDate: post.postedDate || post.posted_at || '',
+                          postUrl: post.post_url || post.postUrl || '',
+                          reactions: post.total_reactions_count || post.reactions || 0,
+                          comments: post.comments_count || post.comments || 0,
+                          reposts: post.reposts_count || post.reposts || 0
+                      };
+                  }).filter(post => post.text); // Only include posts with text content
+
+                  // Include staleness info if available
+                  const dataInfo = apiResponse.data.data_last_updated || 'Unknown';
+                  const stalenessInfo = apiResponse.data.data_staleness_info || '';
+                  const infoText = stalenessInfo 
+                      ? `Found ${formattedPosts.length} LinkedIn posts. Last updated: ${dataInfo}. ${stalenessInfo}`
+                      : `Found ${formattedPosts.length} LinkedIn posts. Last updated: ${dataInfo}`;
 
                   sendResponse({ 
                     jsonrpc: "2.0", 
@@ -654,7 +672,7 @@ async function handleRequest(request) {
                       content: [
                         {
                           type: "text",
-                          text: `Found ${formattedPosts.length} LinkedIn posts. Last updated: ${apiResponse.data.data_last_updated || 'Unknown'}`
+                          text: infoText
                         },
                         {
                           type: "data",
@@ -666,7 +684,16 @@ async function handleRequest(request) {
                     id 
                   });
               } else {
-                  const errorMessage = apiResponse.data?.error || "Backend API Error (no detail)";
+                  // More comprehensive error handling
+                  const errorMessage = apiResponse.data?.error || 
+                                      apiResponse.data?.message ||
+                                      "Backend API Error (no detail)";
+                                      
+                  // Include suggestion if available
+                  const suggestion = apiResponse.data?.suggestion 
+                      ? `\n\nSuggestion: ${apiResponse.data.suggestion}`
+                      : '';
+                                      
                   console.error(`${packageName}: LinkedIn posts API Error: ${errorMessage}`);
                   sendResponse({ 
                     jsonrpc: "2.0", 
@@ -674,7 +701,7 @@ async function handleRequest(request) {
                       content: [
                         {
                           type: "text",
-                          text: `Failed to get LinkedIn posts: ${errorMessage}. This may occur if you haven't set your LinkedIn URL yet. Try using the set_linkedin_url tool first.`
+                          text: `Failed to get LinkedIn posts: ${errorMessage}${suggestion}`
                         }
                       ],
                       isError: true
@@ -686,13 +713,27 @@ async function handleRequest(request) {
           } catch (error) {
               let errorMessage = `Failed to call LinkedIn posts API: ${error.message}`;
               if (error.response) {
+                  // Log complete response for debugging
+                  console.error(`${packageName}: LinkedIn posts API Full Response Headers:`, error.response.headers);
+                  console.error(`${packageName}: LinkedIn posts API Full Response Body:`, error.response.data);
+                  
                   const status = error.response.status;
+                  // Extract error message from response data, handling various formats
+                  const responseData = error.response.data || {};
+                  const extractedError = responseData.error || 
+                                        responseData.message ||
+                                        (typeof responseData === 'string' ? responseData : null);
+                  
                   if (status === 404) {
                       errorMessage = "LinkedIn posts not found. Make sure you've set your LinkedIn URL using set_linkedin_url tool and that the profile is publicly accessible.";
+                      // Add suggestion if available
+                      if (responseData.suggestion) {
+                          errorMessage += `\n\nSuggestion: ${responseData.suggestion}`;
+                      }
                   } else if (status === 401 || status === 403) {
                       errorMessage = "Authentication error. Your API key may be invalid or expired.";
                   } else {
-                      errorMessage = `Backend API Error (Status ${status}): ${error.response.data?.error || "Unknown error"}`;
+                      errorMessage = `Backend API Error (Status ${status}): ${extractedError || "Unknown error"}`;
                   }
                   console.error(`${packageName}: LinkedIn posts API Error Response:`, error.response.data); 
               } else if (error.request) {
@@ -771,12 +812,17 @@ async function handleRequest(request) {
               let errorMessage = `Failed to call LinkedIn profile API: ${error.message}`;
               if (error.response) {
                   const status = error.response.status;
+                  // Extract error message from response data, handling various formats
+                  const responseData = error.response.data || {};
+                  const extractedError = responseData.error || 
+                                        (typeof responseData === 'string' ? responseData : null);
+                  
                   if (status === 404) {
                       errorMessage = "LinkedIn profile not found. Make sure you've set your LinkedIn URL using set_linkedin_url tool and that the profile is publicly accessible.";
                   } else if (status === 401 || status === 403) {
                       errorMessage = "Authentication error. Your API key may be invalid or expired.";
                   } else {
-                      errorMessage = `Backend API Error (Status ${status}): ${error.response.data?.error || "Unknown error"}`;
+                      errorMessage = `Backend API Error (Status ${status}): ${extractedError || "Unknown error"}`;
                   }
                   console.error(`${packageName}: LinkedIn profile API Error Response:`, error.response.data); 
               } else if (error.request) {
@@ -934,7 +980,12 @@ async function handleRequest(request) {
           } catch (error) {
               let errorMessage = `Failed to call refresh LinkedIn profile API: ${error.message}`;
               if (error.response) {
-                  errorMessage = `Backend API Error (Status ${error.response.status})`;
+                  // Extract error message from response data, handling various formats
+                  const responseData = error.response.data || {};
+                  const extractedError = responseData.error || 
+                                        (typeof responseData === 'string' ? responseData : null);
+                  
+                  errorMessage = `Backend API Error (Status ${error.response.status}): ${extractedError || "Unknown error"}`;
                   console.error(`${packageName}: Refresh LinkedIn profile API Error Response:`, error.response.data); 
               } else if (error.request) {
                   errorMessage = "No response received from refresh LinkedIn profile API.";
@@ -1006,7 +1057,12 @@ async function handleRequest(request) {
           } catch (error) {
               let errorMessage = `Failed to call refresh LinkedIn posts API: ${error.message}`;
               if (error.response) {
-                  errorMessage = `Backend API Error (Status ${error.response.status})`;
+                  // Extract error message from response data, handling various formats
+                  const responseData = error.response.data || {};
+                  const extractedError = responseData.error || 
+                                        (typeof responseData === 'string' ? responseData : null);
+                  
+                  errorMessage = `Backend API Error (Status ${error.response.status}): ${extractedError || "Unknown error"}`;
                   console.error(`${packageName}: Refresh LinkedIn posts API Error Response:`, error.response.data); 
               } else if (error.request) {
                   errorMessage = "No response received from refresh LinkedIn posts API.";
