@@ -666,6 +666,15 @@ async function handleRequest(request) {
                       ? `Found ${formattedPosts.length} LinkedIn posts. Last updated: ${dataInfo}. ${stalenessInfo}`
                       : `Found ${formattedPosts.length} LinkedIn posts. Last updated: ${dataInfo}`;
 
+                  // Format posts as text to avoid "unsupported content type: data" error
+                  let postsAsText = formattedPosts.map((post, index) => {
+                    return `Post ${index + 1}:\n` +
+                           `Content: ${post.text}\n` +
+                           `Posted: ${post.postedDate}\n` +
+                           `URL: ${post.postUrl}\n` +
+                           `Metrics: ${post.reactions} reactions, ${post.comments} comments, ${post.reposts} reposts\n`;
+                  }).join('\n\n');
+
                   sendResponse({ 
                     jsonrpc: "2.0", 
                     result: { 
@@ -675,8 +684,8 @@ async function handleRequest(request) {
                           text: infoText
                         },
                         {
-                          type: "data",
-                          data: formattedPosts
+                          type: "text",
+                          text: postsAsText
                         }
                       ],
                       isError: false
@@ -773,6 +782,46 @@ async function handleRequest(request) {
 
               if (apiResponse.data && apiResponse.data.success) {
                   const profile = apiResponse.data.profile || {};
+                  
+                  // Format profile as text to avoid "unsupported content type: data" error
+                  let profileHeadline = profile.headline || 'No headline';
+                  let profileSummary = profile.summary || 'No summary';
+                  
+                  // Format experience entries
+                  let experienceText = 'Experience:';
+                  if (profile.experience && Array.isArray(profile.experience) && profile.experience.length > 0) {
+                      profile.experience.forEach((exp, index) => {
+                          experienceText += `\n\n${index + 1}. ${exp.title || 'Role'} at ${exp.companyName || 'Company'}`;
+                          if (exp.dateRange || exp.duration) {
+                              experienceText += `\n   Duration: ${exp.dateRange || exp.duration || 'Not specified'}`;
+                          }
+                          if (exp.description) {
+                              experienceText += `\n   Description: ${exp.description}`;
+                          }
+                      });
+                  } else {
+                      experienceText += '\n   No experience data available';
+                  }
+                  
+                  // Format education entries
+                  let educationText = '\n\nEducation:';
+                  if (profile.education && Array.isArray(profile.education) && profile.education.length > 0) {
+                      profile.education.forEach((edu, index) => {
+                          educationText += `\n\n${index + 1}. ${edu.schoolName || edu.school || 'Institution'}`;
+                          if (edu.degree || edu.fieldOfStudy) {
+                              educationText += `\n   ${edu.degree || ''} ${edu.fieldOfStudy || ''}`.trim();
+                          }
+                          if (edu.dateRange || edu.dates) {
+                              educationText += `\n   Years: ${edu.dateRange || edu.dates || 'Not specified'}`;
+                          }
+                      });
+                  } else {
+                      educationText += '\n   No education data available';
+                  }
+                  
+                  // Combine all text
+                  const profileText = `Headline: ${profileHeadline}\n\nSummary: ${profileSummary}\n\n${experienceText}${educationText}`;
+                  
                   sendResponse({ 
                     jsonrpc: "2.0", 
                     result: { 
@@ -782,8 +831,8 @@ async function handleRequest(request) {
                           text: `LinkedIn profile data retrieved. Last updated: ${apiResponse.data.data_last_updated || 'Unknown'}`
                         },
                         {
-                          type: "data",
-                          data: profile
+                          type: "text",
+                          text: profileText
                         }
                       ],
                       isError: false
