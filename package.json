@@ -1,6 +1,6 @@
 {
   "name": "linkedin-mcp-runner",
-  "version": "1.4.6",
+  "version": "1.4.7",
   "description": "LinkedIn MCP server by LiGo for LinkedIn (Ertiqah, LLC).",
   "main": "cli.js",
   "bin": {

@@ -8,16 +8,16 @@ const readline = require('readline');
 
 // Configuration
 const packageName = 'linkedin-mcp-runner';
-const backendApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/publish-linkedin-post';
-const backendScheduleApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/schedule-linkedin-post';
-const backendTwitterApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/publish-twitter-post';
-const backendAnalyzeChatApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/analyze-linkedin-chat';
-const backendGeneratePostApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/generate-linkedin-post';
-const backendLinkedinPostsApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/linkedin/posts';
-const backendLinkedinProfileApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/linkedin/profile';
-const backendLinkedinSetUrlApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/linkedin/set-url';
-const backendLinkedinRefreshProfileApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/linkedin/refresh-profile';
-const backendLinkedinRefreshPostsApiUrl = 'https://stage-ligo.ertiqah.com/api/mcp/linkedin/refresh-posts';
+const backendApiUrl = 'https://ligo.ertiqah.com/api/mcp/publish-linkedin-post';
+const backendScheduleApiUrl = 'https://ligo.ertiqah.com/api/mcp/schedule-linkedin-post';
+const backendTwitterApiUrl = 'https://ligo.ertiqah.com/api/mcp/publish-twitter-post';
+const backendAnalyzeChatApiUrl = 'https://ligo.ertiqah.com/api/mcp/analyze-linkedin-chat';
+const backendGeneratePostApiUrl = 'https://ligo.ertiqah.com/api/mcp/generate-linkedin-post';
+const backendLinkedinPostsApiUrl = 'https://ligo.ertiqah.com/api/mcp/linkedin/posts';
+const backendLinkedinProfileApiUrl = 'https://ligo.ertiqah.com/api/mcp/linkedin/profile';
+const backendLinkedinSetUrlApiUrl = 'https://ligo.ertiqah.com/api/mcp/linkedin/set-url';
+const backendLinkedinRefreshProfileApiUrl = 'https://ligo.ertiqah.com/api/mcp/linkedin/refresh-profile';
+const backendLinkedinRefreshPostsApiUrl = 'https://ligo.ertiqah.com/api/mcp/linkedin/refresh-posts';
 
 // Get the actual package name and version from package.json
 let publishedPackageName = packageName;
