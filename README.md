@@ -90,4 +90,4 @@ It’s part of the broader [LiGo platform](https://ligo.ertiqah.com), which cove
 
 This README will be the canonical source for MCP runner updates.
 
-For feedback, improvements, or integration ideas, open an issue or reach out via [ligo.ertiqah.com/contact](https://ligo.ertiqah.com).
+For feedback, improvements, or integration ideas, open an issue or reach out via [ligo.ertiqah.com/contact](https://ligo.ertiqah.com/contact).
