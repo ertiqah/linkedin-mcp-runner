@@ -1,104 +1,93 @@
-# LinkedIn MCP Runner by Ertiqah, LLC
+# LiGo + LinkedIn MCP Runner
 
-This package allows you to interact with your LinkedIn and Twitter accounts (primarily for posting & scheduling posts) using the Claude Desktop Application. 
+![How it works](https://raw.githubusercontent.com/Broever101/bimi-assets/refs/heads/main/how-mcp-works.png)
 
-## Setup Instructions
+**The first GPT-powered creative co-pilot trained on your actual LinkedIn content.**
 
-Follow these steps to integrate this tool with your Claude Desktop app:
+Create posts. Analyze what’s working. Rewrite in your voice. 
+All from Claude or ChatGPT, powered by your own past posts.
 
-**Step 1: Get Your API Key**
+---
 
-1.  Log in to your account at [ligo.ertiqah.com](https://ligo.ertiqah.com/).
-2.  Navigate to the Settings page: [ligo.ertiqah.com/settings#generatekey](https://ligo.ertiqah.com/settings#generatekey)
-3.  Click the button to generate a new API key.
-4.  Follow the prompts to connect your LinkedIn and/or Twitter profiles if you haven't already.
-5.  **Copy the generated API key.** Keep it safe, you'll need it in the next step.
+## What is this?
 
-**Step 2: Configure Claude Desktop App**
+This is the official runner repo for **LiGo’s Model Context Protocol (MCP)** - a protocol that lets GPT-based assistants pull your LinkedIn context and respond like a strategist. It works with both Claude and ChatGPT.
 
-You have two options to configure Claude:
+With MCP, your assistant can answer things like:
+- Which of your last posts got the most traction
+- What your writing tone actually sounds like
+- How to help you post, rewrite, or brainstorm like a founder
 
-### Option 1: Automated Setup (Recommended)
+Just talk to it normally (if you know how to do that - no judging if you don't, btw). It has access to all your PUBLIC Linkedin data (with your consent, of course). 
 
-This is the easiest method. Open your computer's terminal (Terminal on macOS/Linux, PowerShell or Command Prompt on Windows) and run the following command, replacing `YOUR_API_KEY_HERE` with the key you copied in Step 1:
+---
 
-```bash
-npx linkedin-mcp-runner setup --api-key YOUR_API_KEY_HERE
-```
+## How to Get Started
 
-This command will automatically find your Claude configuration file and add the necessary settings for this LinkedIn tool.
+### Claude Setup
 
-### Option 2: Manual Setup
+1. [Download the Claude desktop app](https://claude.ai/download).
+2. Visit [ligo.ertiqah.com/integrations/claude](https://ligo.ertiqah.com/integrations/claude)
+3. Click **"Generate Installation Command"**
+   - If not logged in, you’ll be routed to authenticate with LiGo
+4. Copy the command and run it in your terminal
+5. Open Claude and start chatting
 
-If you prefer not to run the setup script or encounter issues, you can configure Claude manually:
+Example prompt:
+> Analyze my last 5 posts. What’s working? Give me ideas on what I should write next.
 
-1.  **Find your Claude configuration file:**
-    *   **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-    *   **Windows:** `%APPDATA%\Claude\claude_desktop_config.json` (You can paste this path directly into the File Explorer address bar)
-    *   **Linux:** `~/.config/Claude/claude_desktop_config.json`
-2.  **Open the file** with a simple text editor (like TextEdit on Mac, Notepad on Windows, or gedit/nano on Linux).
-3.  **Locate the `"mcpServers": { ... }` section.** If it doesn't exist, you'll need to add it carefully within the main JSON structure (`{ ... }`). It should look something like this (you might already have other servers listed):
-    ```json
-    {
-      // ... other settings ...
-      "mcpServers": {
-        // ... potentially other servers here ...
-      }
-      // ... other settings ...
-    }
-    ```
-4.  **Add the following entry** inside the `mcpServers` curly braces `{}`. If you already have other servers, add a comma `,` after the previous server's closing brace `}` before adding this one. **Replace `"YOUR_API_KEY_HERE"` with the key you copied in Step 1.**
+### ChatGPT (CustomGPT)
 
-    ```json
-        "linkedin": {
-          "command": "npx",
-          "args": [
-            "-y",
-            "linkedin-mcp-runner"
-          ],
-          "env": {
-            "LINKEDIN_MCP_API_KEY": "YOUR_API_KEY_HERE"
-          }
-        }
-    ```
-5.  **Save the file.** Ensure the final structure is valid JSON (pay attention to commas between entries and curly braces). You can use an online JSON validator if unsure.
+No installation needed.
 
-**Step 3: Restart Claude Desktop App**
+1. Go to [ligo.ertiqah.com/integrations/chatgpt](https://ligo.ertiqah.com/integrations/chatgpt)
+2. Authenticate with LiGo when prompted
+3. Start using the CustomGPT
 
-Whether you used the automated or manual setup, **you must restart the Claude Desktop application** for the new configuration to be loaded.
+Example prompt:
+> Rewrite this to sound more like my recent posts and make the hook spicier.
 
-## Usage
+---
 
-Once the tool is set up and Claude is restarted, you can ask Claude to publish posts to your LinkedIn profile or tweets to your Twitter account.
+## See It in Action: [MCP Leaderboard](https://ligo.ertiqah.com/mcp-leaderboard)
 
-### LinkedIn Usage
+We showcase the **latest 50 posts** made using the MCP integration, complete with:
+- The full post
+- A link to the original LinkedIn post
+- The author’s name
 
-**Basic Posting:**
-Simply tell Claude what text you want to post.
+This acts like a public feed. It’s a live demo. And yes, it creates some healthy FOMO + you get a permanent backlink to your post. SEO goes brrrr.
 
-*Example:* `"Hey Claude, please post this to my LinkedIn: 'Excited to share our latest company news!'"`
+![LiGo MCP Leaderboard](https://raw.githubusercontent.com/Broever101/bimi-assets/refs/heads/main/mcp-leaderboard.png)
 
-**Posting with an Image or Video:**
+---
 
-You can also include one or more images or a video in your post. To do this:
+## Why It Matters
 
-1.  **Upload your image/video** to an online hosting service that provides **direct links**. A popular free option is [Postimages](https://postimg.cc/). Make sure you get the "Direct Link" after uploading.
-2.  **Provide both the post text and the direct link(s)** to Claude.
+Honestly, it's a bit of a pain keeping your GPT/Claude Project up to date with your Linkedin activity (assuming you even have one).
 
-*Example:* `"Hi Claude, can you publish the following to my LinkedIn profile, including the image?"`
+We thought: "Wouldn't it be nice if GPT could connect to our Linkedin profile so I could just tell it to go look at it?" 
 
-*   *Post Text:* "Check out the highlights from our team event last week!"
-*   *Image URL:* `https://i.postimg.cc/your-image-code.jpg`
+And then this happened. 
 
-Claude will then use the `publish_linkedin_post` tool with your text and the media URL you provided.
+But, that's not all.
 
-### Twitter Usage
+It’s part of the broader [LiGo platform](https://ligo.ertiqah.com), which covers commenting, analytics, CRM, and more. Go check it out.
 
-**Posting a Tweet:**
-Simply tell Claude what you want to tweet.
+![LiGo Chrome Extension](https://raw.githubusercontent.com/Broever101/bimi-assets/refs/heads/main/elon-meme-ligo.png)
 
-*Example:* `"Hey Claude, please tweet this for me: 'Just launched our new product! Check it out at ligo.ertiqah.com'"`
+---
 
-Claude will use the `publish_twitter_post` tool to send your tweet text to Twitter.
+## Also Check Out
 
-Note: Make sure your Twitter account is properly connected in your ligo.ertiqah.com account settings to enable this functionality.
+- [Chrome Extension](https://chromewebstore.google.com/detail/ligo-for-linkedin%C2%AE/dlclgkldbjggemolgmajabobdcofgjof): Comment and post directly from LinkedIn.
+- [Post Rewriter Tool](https://ligo.ertiqah.com/tools/linkedin-post-rewriter): Turn rough drafts into LinkedIn-ready posts.
+- [What is LiGo?](https://ligo.ertiqah.com/what-is-ligo): Full product overview.
+
+---
+
+## Stay Updated
+
+This README will be the canonical source for MCP runner updates.
+
+For feedback, improvements, or integration ideas, open an issue or reach out via [ligo.ertiqah.com/contact](https://ligo.ertiqah.com).
