@@ -4,6 +4,10 @@
 
 **The first GPT-powered creative co-pilot trained on your actual LinkedIn content.**
 
+<a href="https://glama.ai/mcp/servers/@ertiqah/linkedin-mcp-runner">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@ertiqah/linkedin-mcp-runner/badge" alt="LinkedIn Assistant MCP server" />
+</a>
+
 Create posts. Analyze what’s working. Rewrite in your voice. 
 All from Claude or ChatGPT, powered by your own past posts.
 
