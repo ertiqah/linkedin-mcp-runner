@@ -206,9 +206,11 @@ async function handleRequest(request) {
 
           } catch (error) {
               let errorMessage = `Failed to call backend API: ${error.message}`;
-              // Determine a user-facing error message based on the error type
+              // Preserve the original error message from the backend if available
               if (error.response) {
-                  errorMessage = `Backend API Error (Status ${error.response.status})`;
+                  // Extract the error message directly from the backend response
+                  const backendError = error.response.data?.error || error.response.data?.message;
+                  errorMessage = backendError || `Backend API Error (Status ${error.response.status})`;
                   console.error(`${packageName}: Backend API Error Response:`, error.response.data); 
               } else if (error.request) {
                   errorMessage = "No response received from backend API.";
@@ -307,8 +309,9 @@ async function handleRequest(request) {
           } catch (error) {
               let errorMessage = `Failed to call backend schedule API: ${error.message}`;
               if (error.response) {
-                  const backendError = error.response.data?.error;
-                  errorMessage = backendError ? `Backend API Error: ${backendError}` : `Backend API Error (Status ${error.response.status})`;
+                  // Extract the error message directly from the backend response
+                  const backendError = error.response.data?.error || error.response.data?.message;
+                  errorMessage = backendError || `Backend API Error (Status ${error.response.status})`;
                   console.error(`${packageName}: Backend Schedule API Error Response:`, error.response.data);
               } else if (error.request) {
                   errorMessage = "No response received from backend schedule API.";
@@ -394,7 +397,9 @@ async function handleRequest(request) {
               let errorMessage = `Failed to call Twitter API: ${error.message}`;
               // Determine a user-facing error message based on the error type
               if (error.response) {
-                  errorMessage = `Twitter API Error (Status ${error.response.status})`;
+                  // Extract the error message directly from the backend response
+                  const backendError = error.response.data?.error || error.response.data?.message;
+                  errorMessage = backendError || `Twitter API Error (Status ${error.response.status})`;
                   console.error(`${packageName}: Twitter API Error Response:`, error.response.data); 
               } else if (error.request) {
                   errorMessage = "No response received from Twitter API.";
@@ -481,7 +486,9 @@ async function handleRequest(request) {
           } catch (error) {
               let errorMessage = `Failed to call analyze chat API: ${error.message}`;
               if (error.response) {
-                  errorMessage = `Backend API Error (Status ${error.response.status})`;
+                  // Extract the error message directly from the backend response
+                  const backendError = error.response.data?.error || error.response.data?.message;
+                  errorMessage = backendError || `Backend API Error (Status ${error.response.status})`;
                   console.error(`${packageName}: Analyze chat API Error Response:`, error.response.data); 
               } else if (error.request) {
                   errorMessage = "No response received from analyze chat API.";
@@ -594,7 +601,9 @@ async function handleRequest(request) {
           } catch (error) {
               let errorMessage = `Failed to call generate post API: ${error.message}`;
               if (error.response) {
-                  errorMessage = `Backend API Error (Status ${error.response.status})`;
+                  // Extract the error message directly from the backend response
+                  const backendError = error.response.data?.error || error.response.data?.message;
+                  errorMessage = backendError || `Backend API Error (Status ${error.response.status})`;
                   console.error(`${packageName}: Generate post API Error Response:`, error.response.data); 
               } else if (error.request) {
                   errorMessage = "No response received from generate post API.";
@@ -726,24 +735,25 @@ async function handleRequest(request) {
                   console.error(`${packageName}: LinkedIn posts API Full Response Headers:`, error.response.headers);
                   console.error(`${packageName}: LinkedIn posts API Full Response Body:`, error.response.data);
                   
-                  const status = error.response.status;
-                  // Extract error message from response data, handling various formats
+                  // Extract error message with all details from the response
                   const responseData = error.response.data || {};
                   const extractedError = responseData.error || 
                                         responseData.message ||
                                         (typeof responseData === 'string' ? responseData : null);
                   
-                  if (status === 404) {
-                      errorMessage = "LinkedIn posts not found. Make sure you've set your LinkedIn URL using set_linkedin_url tool and that the profile is publicly accessible.";
-                      // Add suggestion if available
-                      if (responseData.suggestion) {
-                          errorMessage += `\n\nSuggestion: ${responseData.suggestion}`;
-                      }
-                  } else if (status === 401 || status === 403) {
-                      errorMessage = "Authentication error. Your API key may be invalid or expired.";
+                  // Include any suggestion provided
+                  const suggestion = responseData.suggestion
+                      ? `\n\nSuggestion: ${responseData.suggestion}`
+                      : '';
+                  
+                  // Use the backend's full error message
+                  if (extractedError) {
+                      errorMessage = `${extractedError}${suggestion}`;
                   } else {
-                      errorMessage = `Backend API Error (Status ${status}): ${extractedError || "Unknown error"}`;
+                      // Fallback with a generic message but including the status
+                      errorMessage = `Backend API Error (Status ${error.response.status}): Unknown error${suggestion}`;
                   }
+                  
                   console.error(`${packageName}: LinkedIn posts API Error Response:`, error.response.data); 
               } else if (error.request) {
                   errorMessage = "No response received from LinkedIn posts API. The server may be unavailable or experiencing issues.";
@@ -860,19 +870,25 @@ async function handleRequest(request) {
           } catch (error) {
               let errorMessage = `Failed to call LinkedIn profile API: ${error.message}`;
               if (error.response) {
-                  const status = error.response.status;
-                  // Extract error message from response data, handling various formats
+                  // Extract complete error details from the response
                   const responseData = error.response.data || {};
                   const extractedError = responseData.error || 
+                                        responseData.message ||
                                         (typeof responseData === 'string' ? responseData : null);
                   
-                  if (status === 404) {
-                      errorMessage = "LinkedIn profile not found. Make sure you've set your LinkedIn URL using set_linkedin_url tool and that the profile is publicly accessible.";
-                  } else if (status === 401 || status === 403) {
-                      errorMessage = "Authentication error. Your API key may be invalid or expired.";
+                  // Include any suggestion provided
+                  const suggestion = responseData.suggestion
+                      ? `\n\nSuggestion: ${responseData.suggestion}`
+                      : '';
+                  
+                  // Use the backend's full error message
+                  if (extractedError) {
+                      errorMessage = `${extractedError}${suggestion}`;
                   } else {
-                      errorMessage = `Backend API Error (Status ${status}): ${extractedError || "Unknown error"}`;
+                      // Fallback with a generic message but including the status
+                      errorMessage = `Backend API Error (Status ${error.response.status}): Unknown error${suggestion}`;
                   }
+                  
                   console.error(`${packageName}: LinkedIn profile API Error Response:`, error.response.data); 
               } else if (error.request) {
                   errorMessage = "No response received from LinkedIn profile API. The server may be unavailable or experiencing issues.";
@@ -950,14 +966,20 @@ async function handleRequest(request) {
           } catch (error) {
               let errorMessage = `Failed to call set LinkedIn URL API: ${error.message}`;
               if (error.response) {
-                  const status = error.response.status;
-                  if (status === 400) {
-                      errorMessage = "Invalid LinkedIn URL format. Please provide a complete LinkedIn profile URL (e.g., https://www.linkedin.com/in/username/).";
-                  } else if (status === 401 || status === 403) {
-                      errorMessage = "Authentication error. Your API key may be invalid or expired.";
+                  // Extract complete error details from the response
+                  const responseData = error.response.data || {};
+                  const extractedError = responseData.error || 
+                                        responseData.message ||
+                                        (typeof responseData === 'string' ? responseData : null);
+                  
+                  // Use the backend's full error message
+                  if (extractedError) {
+                      errorMessage = extractedError;
                   } else {
-                      errorMessage = `Backend API Error (Status ${status}): ${error.response.data?.error || "Unknown error"}`;
+                      // Fallback with a generic message but including the status
+                      errorMessage = `Backend API Error (Status ${error.response.status}): Unknown error`;
                   }
+                  
                   console.error(`${packageName}: Set LinkedIn URL API Error Response:`, error.response.data); 
               } else if (error.request) {
                   errorMessage = "No response received from set LinkedIn URL API. The server may be unavailable or experiencing issues.";
@@ -1029,12 +1051,20 @@ async function handleRequest(request) {
           } catch (error) {
               let errorMessage = `Failed to call refresh LinkedIn profile API: ${error.message}`;
               if (error.response) {
-                  // Extract error message from response data, handling various formats
+                  // Extract complete error details from the response
                   const responseData = error.response.data || {};
                   const extractedError = responseData.error || 
+                                        responseData.message ||
                                         (typeof responseData === 'string' ? responseData : null);
                   
-                  errorMessage = `Backend API Error (Status ${error.response.status}): ${extractedError || "Unknown error"}`;
+                  // Use the backend's full error message
+                  if (extractedError) {
+                      errorMessage = extractedError;
+                  } else {
+                      // Fallback with a generic message but including the status
+                      errorMessage = `Backend API Error (Status ${error.response.status}): Unknown error`;
+                  }
+                  
                   console.error(`${packageName}: Refresh LinkedIn profile API Error Response:`, error.response.data); 
               } else if (error.request) {
                   errorMessage = "No response received from refresh LinkedIn profile API.";
@@ -1106,12 +1136,20 @@ async function handleRequest(request) {
           } catch (error) {
               let errorMessage = `Failed to call refresh LinkedIn posts API: ${error.message}`;
               if (error.response) {
-                  // Extract error message from response data, handling various formats
+                  // Extract complete error details from the response
                   const responseData = error.response.data || {};
                   const extractedError = responseData.error || 
+                                        responseData.message ||
                                         (typeof responseData === 'string' ? responseData : null);
                   
-                  errorMessage = `Backend API Error (Status ${error.response.status}): ${extractedError || "Unknown error"}`;
+                  // Use the backend's full error message
+                  if (extractedError) {
+                      errorMessage = extractedError;
+                  } else {
+                      // Fallback with a generic message but including the status
+                      errorMessage = `Backend API Error (Status ${error.response.status}): Unknown error`;
+                  }
+                  
                   console.error(`${packageName}: Refresh LinkedIn posts API Error Response:`, error.response.data); 
               } else if (error.request) {
                   errorMessage = "No response received from refresh LinkedIn posts API.";
