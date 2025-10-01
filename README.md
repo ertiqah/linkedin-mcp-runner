@@ -62,8 +62,6 @@ We showcase the **latest 50 posts** made using the MCP integration, complete wit
 
 This acts like a public feed. It’s a live demo. And yes, it creates some healthy FOMO + you get a permanent backlink to your post. SEO goes brrrr.
 
-![LiGo MCP Leaderboard](https://raw.githubusercontent.com/Broever101/bimi-assets/refs/heads/main/mcp-leaderboard.png)
-
 ---
 
 ## Why It Matters
