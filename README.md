@@ -74,10 +74,7 @@ And then this happened.
 
 But, that's not all.
 
-It’s part of the broader [LiGo platform](https://ligo.ertiqah.com), which covers commenting, analytics, CRM, and more. Go check it out.
-
-![LiGo Chrome Extension](https://raw.githubusercontent.com/Broever101/bimi-assets/refs/heads/main/elon-meme-ligo.png)
-
+It’s part of the broader [LigoSocial platform](https://ligosocial.com), which covers commenting, analytics, CRM, and more. Go check it out.
 ---
 
 ## Also Check Out
