@@ -39,11 +39,28 @@ function getConfigPath() {
     switch (platform) {
         case 'darwin':
             return path.join(os.homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
-        case 'win32':
+        case 'win32': {
             if (!process.env.APPDATA) {
                 console.error("Error: APPDATA environment variable not found."); process.exit(1);
             }
+            // Microsoft Store installations use a virtualized AppData path under LocalCache
+            const localAppData = process.env.LOCALAPPDATA;
+            if (localAppData) {
+                const packagesDir = path.join(localAppData, 'Packages');
+                try {
+                    const entries = fs.readdirSync(packagesDir);
+                    const claudePackage = entries.find(e => e.startsWith('Claude_'));
+                    if (claudePackage) {
+                        const msStorePath = path.join(packagesDir, claudePackage, 'LocalCache', 'Roaming', 'Claude', 'claude_desktop_config.json');
+                        const msStoreRoaming = path.join(packagesDir, claudePackage, 'LocalCache', 'Roaming');
+                        if (fs.existsSync(msStorePath) || fs.existsSync(msStoreRoaming)) {
+                            return msStorePath;
+                        }
+                    }
+                } catch (e) {}
+            }
             return path.join(process.env.APPDATA, 'Claude', 'claude_desktop_config.json');
+        }
         case 'linux':
              return path.join(os.homedir(), '.config', 'Claude', 'claude_desktop_config.json');
         default:
@@ -67,8 +84,10 @@ async function runSetup(apiKeyFromArg) {
     } catch (err) { console.error(`Error reading config: ${err}`); process.exit(1); }
     if (!configData.mcpServers) { configData.mcpServers = {}; }
     const apiKeyToUse = apiKeyFromArg || "PASTE_YOUR_API_KEY_HERE";
+    const isWindows = os.platform() === 'win32';
     configData.mcpServers['linkedin'] = {
-        command: "npx", args: ["-y", publishedPackageName],
+        command: isWindows ? "cmd" : "npx",
+        args: isWindows ? ["/c", "npx", "-y", publishedPackageName] : ["-y", publishedPackageName],
         env: { "LINKEDIN_MCP_API_KEY": apiKeyToUse }
     };
     try {
